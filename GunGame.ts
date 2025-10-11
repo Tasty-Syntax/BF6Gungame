@@ -67,19 +67,19 @@ function UpdateScoreboardForPlayer(eventInfo: any, killCount: number, playerLeve
 // Event: Player joined - Setup player
 function DrawPlayerLevelUiText(eventInfo: any) {
   mod.AddUIText(
-    "LevelMessage_" + eventInfo.eventPlayer,
+    "LevelMessage_" + String(eventInfo.eventPlayer),
     mod.CreateVector(0, 0, 0),
     mod.CreateVector(150, 50, 50),
     mod.UIAnchor.CenterLeft,
-    mod.Message("Level: {}", eventInfo.eventPlayer),
+    mod.Message("Level: {}", 1),
     eventInfo.eventPlayer
   );
   mod.SetUIWidgetBgAlpha(
-    mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
+    mod.FindUIWidgetWithName("LevelMessage_" + String(eventInfo.eventPlayer)),
     0.25
   );
   mod.SetUITextSize(
-    mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
+    mod.FindUIWidgetWithName("LevelMessage_" + String(eventInfo.eventPlayer)),
     30
   );
 }
@@ -122,7 +122,7 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
       eventInfo.eventPlayer
     );
     mod.SetUITextLabel(
-      mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
+      mod.FindUIWidgetWithName("LevelMessage_" + String(eventInfo.eventPlayer)),
       mod.Message("Level: {}", playerLevel + 1)
     );
 
