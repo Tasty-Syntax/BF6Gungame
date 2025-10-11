@@ -45,7 +45,7 @@ enum Variables {
 /* ---------------------------------------- */
 
 // Event: Game mode started
-function OnGameModeStarted_Prepare_Gamemode() {
+function InitGameMode() {
   Weapons = CreateWeaponList();
   mod.EnableHQ(mod.GetHQ(1), true);
   mod.SetSpawnMode(mod.SpawnModes.AutoSpawn)
@@ -65,7 +65,7 @@ function UpdateScoreboardForPlayer(eventInfo: any, killCount: number, playerLeve
 }
 
 // Event: Player joined - Setup player
-function OnPlayerJoin_GunGame(eventInfo: any) {
+function DrawPlayerLevelUiText(eventInfo: any) {
   mod.AddUIText(
     "LevelMessage_" + eventInfo.eventPlayer,
     mod.CreateVector(0, 0, 0),
@@ -85,12 +85,12 @@ function OnPlayerJoin_GunGame(eventInfo: any) {
 }
 
 // Event: Player respawned
-function OnPlayerDeployed_GunGame(eventInfo: any) {
+function DeployPlayer(eventInfo: any) {
   SetupPlayer(eventInfo);
 }
 
 // Event: Player killed
-function OnPlayerEarnedKill_GunGame(eventInfo: PlayerEarnedKill) {
+function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
   const getKillCount = () =>
     mod.GetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.KillCount)
@@ -134,7 +134,7 @@ function OnPlayerEarnedKill_GunGame(eventInfo: PlayerEarnedKill) {
 }
 
 // Event: Player died
-function OnPlayerDied_GunGame(eventInfo: PlayerDied) {
+function HandlePlayerDied(eventInfo: PlayerDied) {
   mod.DeployPlayer(eventInfo.eventPlayer);
 }
 
@@ -144,13 +144,13 @@ function OnPlayerDied_GunGame(eventInfo: PlayerDied) {
 export function OnGameModeStarted() {
   const eventInfo = {};
   let eventNum = 0;
-  OnGameModeStarted_Prepare_Gamemode();
+  InitGameMode();
 }
 
 export function OnPlayerJoinGame(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer };
   let eventNum = 0;
-  OnPlayerJoin_GunGame(
+  DrawPlayerLevelUiText(
     eventInfo
   );
 }
@@ -158,7 +158,7 @@ export function OnPlayerJoinGame(eventPlayer: mod.Player) {
 export function OnPlayerDeployed(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer };
 
-  OnPlayerDeployed_GunGame(eventInfo);
+  DeployPlayer(eventInfo);
 }
 
 export function OnPlayerEarnedKill(
@@ -174,7 +174,7 @@ export function OnPlayerEarnedKill(
     eventWeaponUnlock,
   };
 
-  OnPlayerEarnedKill_GunGame(eventInfo);
+  HandlePlayerKill(eventInfo);
 }
 
 export function OnPlayerDied(
@@ -190,7 +190,7 @@ export function OnPlayerDied(
     eventWeaponUnlock,
   };
 
-  OnPlayerDied_GunGame(eventInfo);
+  HandlePlayerDied(eventInfo);
 }
 
 // ########## Game functions ##########//
