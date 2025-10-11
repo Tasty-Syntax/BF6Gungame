@@ -55,6 +55,11 @@ function InitGameMode() {
   mod.EnableHQ(mod.GetHQ(1), true);
   mod.SetSpawnMode(mod.SpawnModes.AutoSpawn);
   PrepareScoreboardForGame();
+
+  // for (let index = 0; index < mod.CountOf(mod.AllPlayers()); index++) {
+  //   const PlayerElement = mod.ValueInArray(mod.AllPlayers(), index);
+  //   mod.SetScoreboardPlayerValues(PlayerElement, 0, 1);
+  // }
 }
 
 function PrepareScoreboardForGame() {
@@ -63,6 +68,7 @@ function PrepareScoreboardForGame() {
   mod.SetScoreboardHeader(mod.Message("Gun Game"));
   mod.SetScoreboardSorting(1, false);
   mod.SetGameModeTargetScore(MAX_LEVEL);
+  mod.SetGameModeTimeLimit(20 * 60); // 20 minutes
 }
 
 function UpdateScoreboardForPlayer(
@@ -79,34 +85,39 @@ function UpdateScoreboardForPlayer(
 
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
-  PlayerIdMap.push({
-    Player: String(eventInfo.eventPlayer),
-    Id: Math.floor(Math.random() * 1000000000),
-  });
-
-  const PlayerId = PlayerIdMap.filter(
-    (e) => e.Player === String(eventInfo.eventPlayer)
-  )[0].Id;
- 
   mod.AddUIText(
-    "LevelMessage_" + PlayerId,
+    "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
     mod.CreateVector(0, 0, 0),
     mod.CreateVector(150, 50, 50),
     mod.UIAnchor.CenterLeft,
-    mod.Message("Level: {}", String(eventInfo.eventPlayer)  + " Hans Joseph"),
+    mod.Message("Level: {}", 1),
     eventInfo.eventPlayer
   );
   mod.SetUIWidgetBgAlpha(
-    mod.FindUIWidgetWithName("LevelMessage_" + PlayerId),
+    mod.FindUIWidgetWithName(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+    ),
     0.25
   );
-  mod.SetUITextSize(mod.FindUIWidgetWithName("LevelMessage_" + PlayerId), 30);
+  mod.SetUITextSize(
+    mod.FindUIWidgetWithName(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+    ),
+    30
+  );
 
-   UpdateScoreboardForPlayer(
-     eventInfo,
-     mod.GetPlayerKills(eventInfo.eventPlayer),
-     1
-   );
+  mod.AddUIButton(
+    "SpectateButton",
+    mod.CreateVector(0, 80, 0),
+    mod.CreateVector(200, 50, 50),
+    mod.UIAnchor.CenterLeft
+  );
+
+  UpdateScoreboardForPlayer(
+    eventInfo,
+    mod.GetPlayerKills(eventInfo.eventPlayer),
+    0
+  );
 }
 
 // Event: Player respawned
@@ -130,11 +141,12 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
   );
 
-  if (playerLevel === MAX_LEVEL) {
-    return mod.EndGameMode(eventInfo.eventPlayer);
+  if (playerLevel >= MAX_LEVEL) {
+    EndGame(eventInfo.eventPlayer);
+    return;
   }
 
-
+  // If player reached 2 kills, level up
   if (getKillCount() >= 2) {
     mod.SetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
@@ -147,15 +159,12 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
       eventInfo.eventPlayer
     );
 
-    const PlayerIdEntry = PlayerIdMap.filter(
-      (e) => e.Player === String(eventInfo.eventPlayer)
-    )[0];
-    if (PlayerIdEntry) {
-      mod.SetUITextLabel(
-        mod.FindUIWidgetWithName("LevelMessage_" + PlayerIdEntry.Id),
-        mod.Message("Level: {}", playerLevel)
-      );
-    }
+    mod.SetUITextLabel(
+      mod.FindUIWidgetWithName(
+        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+      ),
+      mod.Message("Level: {}", playerLevel + 1)
+    );
 
     // reset killcount to 0
     mod.SetVariable(
@@ -176,7 +185,10 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
 
 // Event: Player died
 function HandlePlayerDied(eventInfo: PlayerDied) {
-  mod.DeployPlayer(eventInfo.eventPlayer);
+  // mod.DisplayNotificationMessage(
+  //   mod.Message("")
+  // );
+  //HandlePlayerLoseLevelOnKnifeDeath(eventInfo);
 }
 
 /* ---------------------------------------- */
@@ -184,13 +196,11 @@ function HandlePlayerDied(eventInfo: PlayerDied) {
 /* ---------------------------------------- */
 export function OnGameModeStarted() {
   const eventInfo = {};
-  let eventNum = 0;
   InitGameMode();
 }
 
 export function OnPlayerJoinGame(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer };
-  let eventNum = 0;
   InitPlayerOnJoin(eventInfo);
 }
 
@@ -232,9 +242,21 @@ export function OnPlayerDied(
   HandlePlayerDied(eventInfo);
 }
 
-/* ---------------------------------------- */
-/*                Game Functions            */
-/* ---------------------------------------- */
+// ########## Game functions ##########//
+
+function EndGame(playerWon: mod.Player) {
+  mod.AddUIText(
+    "EndGameWon",
+    mod.CreateVector(0, 150, 0),
+    mod.CreateVector(150, 50, 50),
+    mod.UIAnchor.TopCenter,
+    mod.Message("Player {} won the Game!", playerWon)
+  );
+  mod.SetUITextSize(mod.FindUIWidgetWithName("EndGameWon"), 70);
+
+  mod.EndGameMode(playerWon);
+}
+
 function SetupPlayer(eventInfo: any) {
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.PrimaryWeapon);
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.MeleeWeapon);
@@ -252,8 +274,22 @@ function SetupPlayer(eventInfo: any) {
     mod.AddEquipment(eventInfo.eventPlayer, Weapons[playerLevel]);
     mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
   } else {
+    mod.DisplayNotificationMessage(
+      mod.Message(
+        "Player {} has reached the last level!",
+        eventInfo.eventPlayer
+      )
+    );
+
     SetKnifeWeapon(eventInfo.eventPlayer);
   }
+
+  // To fix getting Level 0 randomly on join
+  UpdateScoreboardForPlayer(
+    eventInfo,
+    mod.GetPlayerKills(eventInfo.eventPlayer),
+    playerLevel
+  );
 }
 
 function SetKnifeWeapon(player: mod.Player) {
@@ -263,6 +299,37 @@ function SetKnifeWeapon(player: mod.Player) {
   mod.AddEquipment(player, mod.Gadgets.Misc_Defibrillator);
 
   mod.ForceSwitchInventory(player, mod.InventorySlots.GadgetOne);
+}
+
+function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
+  let playerLevel: number = mod.GetVariable(
+    mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
+  );
+  if (playerLevel == 0) {
+    return;
+  }
+  playerLevel = -1;
+  mod.SetVariable(
+    mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
+    playerLevel
+  );
+  // Was player killed by melee?
+  if (
+    mod.EventDeathTypeCompare(
+      eventInfo.eventDeathType,
+      mod.PlayerDeathTypes.Melee
+    )
+  ) {
+    mod.SetVariable(
+      mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
+      mod.Subtract(playerLevel, 1)
+    );
+    UpdateScoreboardForPlayer(
+      eventInfo,
+      mod.GetPlayerKills(eventInfo.eventPlayer),
+      playerLevel
+    );
+  }
 }
 
 function CreateWeaponList(): any[] {
@@ -362,4 +429,4 @@ function CreateWeaponList(): any[] {
   return result;
 }
 
-// Nice schwanz bro: 51
+// Nice schwanz bro: 56

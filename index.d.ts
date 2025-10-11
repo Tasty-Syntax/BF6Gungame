@@ -21,7 +21,7 @@ declare namespace mod {
 
     // export type CapturePoint = never;
     // export type CapturePoint = Any;
-    const CapturePointSymbol: unique symbol;
+    const CapturePointSymbol: unique Playersymbol;
     export type CapturePoint = { _opaque: typeof CapturePointSymbol };
 
     // export type DamageType = never;
