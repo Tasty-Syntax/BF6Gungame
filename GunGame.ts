@@ -34,7 +34,9 @@ const MAX_LEVEL = 15;
  * Variable IDs
  */
 enum Variables {
+  /** Weapon Gun Level Weapon */
   PlayerLevel = 0,
+  /** Killcount to keep track of kills in each Weaponlevel */
   KillCount = 1,
 }
 
@@ -48,13 +50,27 @@ function OnGameModeStarted_Prepare_Gamemode() {
   mod.EnableHQ(mod.GetHQ(1), true);
 }
 
+// Event: Player joined - Setup player
+function OnPlayerJoin_GunGame(eventInfo: any) {
+  mod.AddUIText(
+    "LevelMessage_" + eventInfo.eventPlayer.,
+    mod.CreateVector(0, 0, 0),
+    mod.CreateVector(100, 50, 50),
+    mod.UIAnchor.CenterLeft,
+    mod.Message("Level: {}", 1),
+    eventInfo.eventPlayer
+  );
+  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.), 0.5);
+  mod.SetUITextSize(mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.), 50);
+}
+
 // Event: Player respawned
 function OnPlayerDeployed_GunGame(eventInfo: any) {
   SetupPlayer(eventInfo);
 }
 
 // Event: Player killed
-function OnPlayerEarnedKill_GunGame(eventInfo: any) {
+function OnPlayerEarnedKill_GunGame(eventInfo: PlayerEarnedKill) {
   const getKillCount = () =>
     mod.GetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.KillCount)
@@ -64,6 +80,7 @@ function OnPlayerEarnedKill_GunGame(eventInfo: any) {
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.KillCount),
     mod.Add(getKillCount(), 1)
   );
+  
 
   const playerLevel = mod.GetVariable(
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
@@ -75,27 +92,13 @@ function OnPlayerEarnedKill_GunGame(eventInfo: any) {
       mod.Add(playerLevel, 1)
     );
 
-    mod.AddUIText(
-      "Levelup",
-      mod.CreateVector(0, 0, 0),
-      mod.CreateVector(100, 50, 50),
-      mod.UIAnchor.TopCenter,
-      mod.FindUIWidgetWithName(""),
-      true,
-      5,
-      mod.CreateVector(255, 0, 0),
-      100,
-      mod.UIBgFill.Blur,
-      mod.Message("LEVEL UP"),
-      50,
-      mod.CreateVector(255, 255, 255),
-      100,
-      mod.UIAnchor.Center
+    mod.DisplayHighlightedWorldLogMessage(
+      mod.Message("Level up!"),
+      eventInfo.eventPlayer
     );
-
-    setTimeout(
-      () => mod.DeleteUIWidget(mod.FindUIWidgetWithName("Levelup")),
-      2000
+    mod.SetUITextLabel(
+      mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.),
+      mod.Message("Level: {}", playerLevel + 1)
     );
 
     // reset killcount to 0
@@ -121,6 +124,14 @@ export function OnGameModeStarted() {
   const eventInfo = {};
   let eventNum = 0;
   OnGameModeStarted_Prepare_Gamemode();
+}
+
+export function OnPlayerJoinGame(eventPlayer: mod.Player) {
+  const eventInfo = { eventPlayer };
+  let eventNum = 0;
+  OnPlayerJoin_GunGame(
+    eventInfo
+  );
 }
 
 export function OnPlayerDeployed(eventPlayer: mod.Player) {
@@ -167,7 +178,10 @@ function SetupPlayer(eventInfo: any) {
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.PrimaryWeapon);
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.MeleeWeapon);
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.Throwable);
-  mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.SecondaryWeapon);
+  mod.RemoveEquipment(
+    eventInfo.eventPlayer,
+    mod.InventorySlots.SecondaryWeapon
+  );
 
   const playerLevel: number = mod.GetVariable(
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
@@ -176,21 +190,18 @@ function SetupPlayer(eventInfo: any) {
   if (playerLevel < MAX_LEVEL) {
     mod.AddEquipment(eventInfo.eventPlayer, Weapons[playerLevel]);
     mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
-    mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Throwable_Throwing_Knife);
   } else {
     SetKnifeWeapon(eventInfo.eventPlayer);
-  }
+  } 
 }
 
 function SetKnifeWeapon(player: mod.Player) {
-    // Remove old weapon
-    mod.RemoveEquipment(player, mod.InventorySlots.PrimaryWeapon);
-    mod.RemoveEquipment(
-        player,
-        mod.InventorySlots.SecondaryWeapon
-    );
+  // Remove old weapon
+  mod.RemoveEquipment(player, mod.InventorySlots.PrimaryWeapon);
+  mod.RemoveEquipment(player, mod.InventorySlots.SecondaryWeapon);
   mod.AddEquipment(player, mod.Gadgets.Misc_Defibrillator);
-  mod.AddEquipment(player, mod.Gadgets.Throwable_Throwing_Knife);
+  
+  mod.ForceSwitchInventory(player, mod.InventorySlots.GadgetOne);
 }
 
 function CreateWeaponList(): any[] {
