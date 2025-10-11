@@ -48,20 +48,40 @@ enum Variables {
 function OnGameModeStarted_Prepare_Gamemode() {
   Weapons = CreateWeaponList();
   mod.EnableHQ(mod.GetHQ(1), true);
+  mod.SetSpawnMode(mod.SpawnModes.AutoSpawn)
+  PrepareScoreboardForGame();
+}
+
+function PrepareScoreboardForGame() {
+  mod.SetScoreboardType(mod.ScoreboardType.CustomFFA)
+  mod.SetScoreboardColumnNames(mod.Message("Player"), mod.Message("Kills"), mod.Message("Level"))
+  mod.SetScoreboardHeader(mod.Message("Gun Game"))
+  mod.SetScoreboardSorting(2, false)
+  mod.SetGameModeTargetScore(MAX_LEVEL)
+}
+
+function UpdateScoreboardForPlayer(eventInfo: any, killCount: number, playerLevel: number) {
+  mod.SetScoreboardPlayerValues(eventInfo.eventPlayer, eventInfo.eventPlayer, killCount, playerLevel)
 }
 
 // Event: Player joined - Setup player
 function OnPlayerJoin_GunGame(eventInfo: any) {
   mod.AddUIText(
-    "LevelMessage_" + eventInfo.eventPlayer.,
+    "LevelMessage_" + eventInfo.eventPlayer,
     mod.CreateVector(0, 0, 0),
-    mod.CreateVector(100, 50, 50),
+    mod.CreateVector(150, 50, 50),
     mod.UIAnchor.CenterLeft,
-    mod.Message("Level: {}", 1),
+    mod.Message("Level: {}", eventInfo.eventPlayer),
     eventInfo.eventPlayer
   );
-  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.), 0.5);
-  mod.SetUITextSize(mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.), 50);
+  mod.SetUIWidgetBgAlpha(
+    mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
+    0.25
+  );
+  mod.SetUITextSize(
+    mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
+    30
+  );
 }
 
 // Event: Player respawned
@@ -97,7 +117,7 @@ function OnPlayerEarnedKill_GunGame(eventInfo: PlayerEarnedKill) {
       eventInfo.eventPlayer
     );
     mod.SetUITextLabel(
-      mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer.),
+      mod.FindUIWidgetWithName("LevelMessage_" + eventInfo.eventPlayer),
       mod.Message("Level: {}", playerLevel + 1)
     );
 
@@ -107,6 +127,7 @@ function OnPlayerEarnedKill_GunGame(eventInfo: PlayerEarnedKill) {
       0
     );
 
+    UpdateScoreboardForPlayer(eventInfo, mod.GetPlayerKills(eventInfo.eventPlayer), playerLevel);
     // set new player inventory
     SetupPlayer(eventInfo);
   }
@@ -200,7 +221,7 @@ function SetKnifeWeapon(player: mod.Player) {
   mod.RemoveEquipment(player, mod.InventorySlots.PrimaryWeapon);
   mod.RemoveEquipment(player, mod.InventorySlots.SecondaryWeapon);
   mod.AddEquipment(player, mod.Gadgets.Misc_Defibrillator);
-  
+
   mod.ForceSwitchInventory(player, mod.InventorySlots.GadgetOne);
 }
 
