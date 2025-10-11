@@ -130,6 +130,11 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
   );
 
+  if (playerLevel === MAX_LEVEL) {
+    return mod.EndGameMode(eventInfo.eventPlayer);
+  }
+
+
   if (getKillCount() >= 2) {
     mod.SetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
@@ -227,8 +232,9 @@ export function OnPlayerDied(
   HandlePlayerDied(eventInfo);
 }
 
-// ########## Game functions ##########//
-
+/* ---------------------------------------- */
+/*                Game Functions            */
+/* ---------------------------------------- */
 function SetupPlayer(eventInfo: any) {
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.PrimaryWeapon);
   mod.RemoveEquipment(eventInfo.eventPlayer, mod.InventorySlots.MeleeWeapon);
