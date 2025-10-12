@@ -49,6 +49,11 @@ let Weapons: Array<WeaponItem> = [];
 const MAX_LEVEL = 15;
 
 /**
+ * Gamemode Version
+ */
+const VERSION = "0.0.100"
+
+/**
  * Variable IDs
  */
 enum Variables {
@@ -64,6 +69,13 @@ enum Variables {
 
 // Event: Game mode started
 function InitGameMode() {
+  mod.AddUIText(
+    "EndGameWon",
+    mod.CreateVector(10, 10, 10),
+    mod.CreateVector(50, 50, 50),
+    mod.UIAnchor.TopRight,
+    mod.Message("{}", VERSION)
+  );
   Weapons = CreateWeaponList();
   mod.EnableHQ(mod.GetHQ(0), true);
   // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(0));
@@ -80,6 +92,7 @@ function InitGameMode() {
 function PrepareScoreboardForGame() {
   mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
   mod.SetScoreboardColumnNames(mod.Message("Level"), mod.Message("Kills"), mod.Message("Deaths"));
+  mod.SetScoreboardColumnWidths(1, 1, 1, 0, 0);
   mod.SetScoreboardHeader(mod.Message("Gun Game"));
   mod.SetScoreboardSorting(1, false);
   mod.SetGameModeTargetScore(MAX_LEVEL);
@@ -267,6 +280,7 @@ function EndGame(playerWon: mod.Player) {
     mod.UIAnchor.TopCenter,
     mod.Message("{}", playerWon)
   );
+
   mod.AddUIText(
     "WonTheGame",
     mod.CreateVector(55, 250, 0),
