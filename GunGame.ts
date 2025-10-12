@@ -79,7 +79,7 @@ function InitGameMode() {
 
 function PrepareScoreboardForGame() {
   mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
-  mod.SetScoreboardColumnNames(mod.Message("Kills"), mod.Message("Level"));
+  mod.SetScoreboardColumnNames(mod.Message("Level"), mod.Message("Kills"), mod.Message("Deaths"));
   mod.SetScoreboardHeader(mod.Message("Gun Game"));
   mod.SetScoreboardSorting(1, false);
   mod.SetGameModeTargetScore(MAX_LEVEL);
@@ -89,12 +89,14 @@ function PrepareScoreboardForGame() {
 function UpdateScoreboardForPlayer(
   eventInfo: any,
   killCount: number,
-  playerLevel: number
+  playerLevel: number,
+  deathCount: number
 ) {
   mod.SetScoreboardPlayerValues(
     eventInfo.eventPlayer,
+    playerLevel + 1,
     killCount,
-    playerLevel + 1
+    deathCount
   );
 }
 
@@ -102,13 +104,7 @@ function UpdateScoreboardForPlayer(
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
   // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(2))
-  mod.DisplayNotificationMessage(
-    mod.Message(
-      "Player {} has reached the last level!",
-      mod.CountOf(mod.AllPlayers()) 
-    )
-  );
-
+  
   if (!mod.FindUIWidgetWithName("LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer))) {
     mod.AddUIText(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
@@ -134,8 +130,9 @@ function InitPlayerOnJoin(eventInfo: any) {
 
   UpdateScoreboardForPlayer(
     eventInfo,
+    0,
     mod.GetPlayerKills(eventInfo.eventPlayer),
-    0
+    mod.GetPlayerDeaths(eventInfo.eventPlayer)
   );
 }
 
@@ -198,8 +195,9 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
 
   UpdateScoreboardForPlayer(
     eventInfo,
+    playerLevel,
     mod.GetPlayerKills(eventInfo.eventPlayer),
-    playerLevel
+    mod.GetPlayerDeaths(eventInfo.eventPlayer)
   );
 }
 
@@ -267,10 +265,21 @@ function EndGame(playerWon: mod.Player) {
     mod.CreateVector(-50, 150, 0),
     mod.CreateVector(150, 50, 50),
     mod.UIAnchor.TopCenter,
-    mod.Message("Player {} won the Game!", playerWon)
+    mod.Message("{}", playerWon)
   );
+  mod.AddUIText(
+    "WonTheGame",
+    mod.CreateVector(55, 250, 0),
+    mod.CreateVector(535, 50, 50),
+    mod.UIAnchor.TopCenter,
+    mod.Message("has won the Game!")
+  );
+
+   
   mod.SetUITextSize(mod.FindUIWidgetWithName("EndGameWon"), 70);
   mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("EndGameWon"), 0);
+  mod.SetUITextSize(mod.FindUIWidgetWithName("WonTheGame"), 70);
+  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("WonTheGame"), 0);
 
   mod.EndGameMode(playerWon);
 
@@ -311,8 +320,9 @@ function SetupPlayer(eventInfo: any) {
   // To fix getting Level 0 randomly on join
   UpdateScoreboardForPlayer(
     eventInfo,
+    playerLevel,
     mod.GetPlayerKills(eventInfo.eventPlayer),
-    playerLevel
+    mod.GetPlayerDeaths(eventInfo.eventPlayer)
   );
 }
 
@@ -385,8 +395,9 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
 
     UpdateScoreboardForPlayer(
       eventInfo,
+      playerLevel,
       mod.GetPlayerKills(eventInfo.eventPlayer),
-      playerLevel
+      mod.GetPlayerDeaths(eventInfo.eventPlayer)
     );
   }
 }
@@ -500,5 +511,3 @@ function WrapWeaponType(weapons: Array<mod.Weapons | mod.Gadgets>, weaponType: W
     gadgetPosition
   }));
 }
-
-// Nice schwanz bro: 74
