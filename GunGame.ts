@@ -43,11 +43,6 @@ type WeaponItem = {
  */
 let Weapons: Array<WeaponItem> = [];
 
-const PlayerIdMap: Array<{
-  Player: string;
-  Id: number;
-}> = [];
-
 /**
  * Max weapon playerlevel
  */
@@ -70,14 +65,16 @@ enum Variables {
 // Event: Game mode started
 function InitGameMode() {
   Weapons = CreateWeaponList();
-  mod.EnableHQ(mod.GetHQ(1), true);
+  mod.EnableHQ(mod.GetHQ(0), true);
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(0));
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(1));
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(2));
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(3));
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(4));
+  // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(5));
+
   mod.SetSpawnMode(mod.SpawnModes.AutoSpawn);
   PrepareScoreboardForGame();
-
-  // for (let index = 0; index < mod.CountOf(mod.AllPlayers()); index++) {
-  //   const PlayerElement = mod.ValueInArray(mod.AllPlayers(), index);
-  //   mod.SetScoreboardPlayerValues(PlayerElement, 0, 1);
-  // }
 }
 
 function PrepareScoreboardForGame() {
@@ -101,8 +98,17 @@ function UpdateScoreboardForPlayer(
   );
 }
 
+
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
+  // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(2))
+  mod.DisplayNotificationMessage(
+    mod.Message(
+      "Player {} has reached the last level!",
+      mod.CountOf(mod.AllPlayers()) 
+    )
+  );
+
   if (!mod.FindUIWidgetWithName("LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer))) {
     mod.AddUIText(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
@@ -136,6 +142,7 @@ function InitPlayerOnJoin(eventInfo: any) {
 // Event: Player respawned
 function DeployPlayer(eventInfo: any) {
   SetupPlayer(eventInfo);
+  // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(mod.CountOf(mod.AllPlayers()) + 1));
 }
 
 // Event: Player killed
@@ -266,7 +273,7 @@ function EndGame(playerWon: mod.Player) {
   mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("EndGameWon"), 0);
 
   mod.EndGameMode(playerWon);
-  
+
   //Maybe:
   // await mod.Wait(2);
   // remove text
@@ -362,7 +369,7 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
     )
   ) {
     playerLevel -= 1;
-    
+
     mod.SetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
       playerLevel
@@ -494,4 +501,4 @@ function WrapWeaponType(weapons: Array<mod.Weapons | mod.Gadgets>, weaponType: W
   }));
 }
 
-// Nice schwanz bro: 73
+// Nice schwanz bro: 74
