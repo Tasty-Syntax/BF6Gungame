@@ -77,6 +77,24 @@ function InitGameMode() {
   PrepareScoreboardForGame();
 }
 
+let timestamp = 0;
+function HandleOngoingPlayer(conditionState: any, eventInfo: any) {
+  if (timestamp === mod.GetMatchTimeElapsed()) {
+    return;
+  }
+
+  timestamp = mod.GetMatchTimeElapsed();
+
+  const Time = Math.floor(mod.GetMatchTimeElapsed());
+  const Minutes = Math.floor(Time / 60);
+  const Seconds = Time % 60;
+
+  mod.SetUITextLabel(
+    mod.FindUIWidgetWithName("Time"),
+    mod.Message("Time: {}", `${Minutes}:${Seconds}`)
+  );
+}
+
 function PrepareScoreboardForGame() {
   mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
   mod.SetScoreboardColumnNames(mod.Message("Level"), mod.Message("Kills"), mod.Message("Deaths"));
@@ -104,7 +122,7 @@ function UpdateScoreboardForPlayer(
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
   // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(2))
-  
+
   if (!mod.FindUIWidgetWithName("LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer))) {
     mod.AddUIText(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
@@ -124,6 +142,25 @@ function InitPlayerOnJoin(eventInfo: any) {
       mod.FindUIWidgetWithName(
         "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
       ),
+      30
+    );
+  }
+
+  if (!mod.FindUIWidgetWithName("Time")) {
+    mod.AddUIText(
+      "Time",
+      mod.CreateVector(0, 0, 0),
+      mod.CreateVector(150, 50, 50),
+      mod.UIAnchor.TopCenter,
+      mod.Message("Time: {}", 1),
+      eventInfo.eventPlayer
+    );
+    mod.SetUIWidgetBgAlpha(
+      mod.FindUIWidgetWithName("Time"),
+      0.25
+    );
+    mod.SetUITextSize(
+      mod.FindUIWidgetWithName("Time"),
       30
     );
   }
@@ -214,6 +251,12 @@ export function OnGameModeStarted() {
   InitGameMode();
 }
 
+export function OngoingPlayer(eventPlayer: mod.Player) {
+  const eventInfo = { eventPlayer: eventPlayer };
+  let eventNum = 0;
+  HandleOngoingPlayer(modlib.getPlayerCondition(eventPlayer, eventNum++), eventInfo);
+}
+
 export function OnPlayerJoinGame(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer };
   InitPlayerOnJoin(eventInfo);
@@ -275,7 +318,7 @@ function EndGame(playerWon: mod.Player) {
     mod.Message("has won the Game!")
   );
 
-   
+
   mod.SetUITextSize(mod.FindUIWidgetWithName("EndGameWon"), 70);
   mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("EndGameWon"), 0);
   mod.SetUITextSize(mod.FindUIWidgetWithName("WonTheGame"), 70);
