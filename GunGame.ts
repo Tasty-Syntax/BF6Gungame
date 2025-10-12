@@ -17,13 +17,31 @@ type PlayerDied = {
   eventWeaponUnlock: mod.WeaponUnlock;
 };
 
+enum WeaponType {
+  Weapon,
+  Gadget
+};
+
+enum GadgetPosition {
+  GadgetOne = mod.InventorySlots.GadgetOne,
+  GadgetTwo = mod.InventorySlots.GadgetTwo,
+  MiscGadget = mod.InventorySlots.MiscGadget,
+  ClassGadget = mod.InventorySlots.ClassGadget
+}
+
+type WeaponItem = {
+  item: mod.Weapons | mod.Gadgets;
+  weaponType: WeaponType;
+  gadgetPosition?: GadgetPosition;
+};
+
 /* ---------------------------------------- */
 /*                  Variables               */
 /* ---------------------------------------- */
 /**
  * Randomized weapons list
  */
-let Weapons: Array<mod.Weapons> = [];
+let Weapons: Array<WeaponItem> = [];
 
 const PlayerIdMap: Array<{
   Player: string;
@@ -85,33 +103,28 @@ function UpdateScoreboardForPlayer(
 
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
-  mod.AddUIText(
-    "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
-    mod.CreateVector(0, 0, 0),
-    mod.CreateVector(150, 50, 50),
-    mod.UIAnchor.CenterLeft,
-    mod.Message("Level: {}", 1),
-    eventInfo.eventPlayer
-  );
-  mod.SetUIWidgetBgAlpha(
-    mod.FindUIWidgetWithName(
-      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-    ),
-    0.25
-  );
-  mod.SetUITextSize(
-    mod.FindUIWidgetWithName(
-      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-    ),
-    30
-  );
-
-  mod.AddUIButton(
-    "SpectateButton",
-    mod.CreateVector(0, 80, 0),
-    mod.CreateVector(200, 50, 50),
-    mod.UIAnchor.CenterLeft
-  );
+  if (!mod.FindUIWidgetWithName("LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer))) {
+    mod.AddUIText(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
+      mod.CreateVector(0, 0, 0),
+      mod.CreateVector(150, 50, 50),
+      mod.UIAnchor.CenterLeft,
+      mod.Message("Level: {}", 1),
+      eventInfo.eventPlayer
+    );
+    mod.SetUIWidgetBgAlpha(
+      mod.FindUIWidgetWithName(
+        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+      ),
+      0.25
+    );
+    mod.SetUITextSize(
+      mod.FindUIWidgetWithName(
+        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+      ),
+      30
+    );
+  }
 
   UpdateScoreboardForPlayer(
     eventInfo,
@@ -185,10 +198,7 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
 
 // Event: Player died
 function HandlePlayerDied(eventInfo: PlayerDied) {
-  // mod.DisplayNotificationMessage(
-  //   mod.Message("")
-  // );
-  //HandlePlayerLoseLevelOnKnifeDeath(eventInfo);
+  HandlePlayerLoseLevelOnKnifeDeath(eventInfo);
 }
 
 /* ---------------------------------------- */
@@ -247,14 +257,19 @@ export function OnPlayerDied(
 function EndGame(playerWon: mod.Player) {
   mod.AddUIText(
     "EndGameWon",
-    mod.CreateVector(0, 150, 0),
+    mod.CreateVector(-50, 150, 0),
     mod.CreateVector(150, 50, 50),
     mod.UIAnchor.TopCenter,
     mod.Message("Player {} won the Game!", playerWon)
   );
   mod.SetUITextSize(mod.FindUIWidgetWithName("EndGameWon"), 70);
+  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("EndGameWon"), 0);
 
   mod.EndGameMode(playerWon);
+  
+  //Maybe:
+  // await mod.Wait(2);
+  // remove text
 }
 
 function SetupPlayer(eventInfo: any) {
@@ -271,8 +286,10 @@ function SetupPlayer(eventInfo: any) {
   );
 
   if (playerLevel < MAX_LEVEL) {
-    mod.AddEquipment(eventInfo.eventPlayer, Weapons[playerLevel]);
-    mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
+    const item = Weapons[playerLevel];
+    Equip(item, eventInfo.eventPlayer);
+    // mod.AddEquipment(eventInfo.eventPlayer, );
+    // mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
   } else {
     mod.DisplayNotificationMessage(
       mod.Message(
@@ -294,25 +311,49 @@ function SetupPlayer(eventInfo: any) {
 
 function SetKnifeWeapon(player: mod.Player) {
   // Remove old weapon
+  UnequipAll(player);
+  mod.AddEquipment(player, mod.Gadgets.Melee_Combat_Knife);
+}
+
+function UnequipAll(player: mod.Player) {
   mod.RemoveEquipment(player, mod.InventorySlots.PrimaryWeapon);
   mod.RemoveEquipment(player, mod.InventorySlots.SecondaryWeapon);
-  mod.AddEquipment(player, mod.Gadgets.Misc_Defibrillator);
+  mod.RemoveEquipment(player, mod.InventorySlots.GadgetOne);
+  mod.RemoveEquipment(player, mod.InventorySlots.GadgetTwo);
+  mod.RemoveEquipment(player, mod.InventorySlots.Throwable);
+}
 
+function Equip(item: WeaponItem, player: mod.Player) {
+  if (item.weaponType === WeaponType.Weapon) {
+    EquipWeapon(player, item.item as mod.Weapons);
+  } else if (item.weaponType === WeaponType.Gadget) {
+    EquipGadget(player, item.item as mod.Gadgets, item.gadgetPosition);
+  }
+  mod.AddEquipment(player, mod.Gadgets.Melee_Combat_Knife);
+}
+
+function EquipGadget(player: mod.Player, gadget: mod.Gadgets, gadgetPosition: number = 1) {
+  UnequipAll(player);
+  mod.AddEquipment(player, gadget, mod.InventorySlots.GadgetOne);
   mod.ForceSwitchInventory(player, mod.InventorySlots.GadgetOne);
+}
+
+function EquipWeapon(player: mod.Player, weapon: mod.Weapons) {
+  UnequipAll(player);
+
+  mod.AddEquipment(player, weapon);
+  mod.ForceSwitchInventory(player, mod.InventorySlots.PrimaryWeapon);
 }
 
 function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
   let playerLevel: number = mod.GetVariable(
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
   );
+
   if (playerLevel == 0) {
     return;
   }
-  playerLevel = -1;
-  mod.SetVariable(
-    mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
-    playerLevel
-  );
+
   // Was player killed by melee?
   if (
     mod.EventDeathTypeCompare(
@@ -320,10 +361,21 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
       mod.PlayerDeathTypes.Melee
     )
   ) {
+    playerLevel -= 1;
+    
     mod.SetVariable(
       mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel),
-      mod.Subtract(playerLevel, 1)
+      playerLevel
     );
+
+    // Maybe put this into a function to save some lines of code
+    mod.SetUITextLabel(
+      mod.FindUIWidgetWithName(
+        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+      ),
+      mod.Message("Level: {}", playerLevel + 1)
+    );
+
     UpdateScoreboardForPlayer(
       eventInfo,
       mod.GetPlayerKills(eventInfo.eventPlayer),
@@ -332,21 +384,21 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
   }
 }
 
-function CreateWeaponList(): any[] {
-  const sidearms = [
+function CreateWeaponList(): WeaponItem[] {
+  const sidearms = WrapWeaponType([
     mod.Weapons.Sidearm_ES_57,
     mod.Weapons.Sidearm_M44,
     mod.Weapons.Sidearm_M45A1,
     mod.Weapons.Sidearm_P18,
-  ];
+  ], WeaponType.Weapon);
 
-  const shotguns = [
+  const shotguns = WrapWeaponType([
     mod.Weapons.Shotgun__185KS_K,
     mod.Weapons.Shotgun_M1014,
     mod.Weapons.Shotgun_M87A1,
-  ];
+  ], WeaponType.Weapon);
 
-  const smgs = [
+  const smgs = WrapWeaponType([
     mod.Weapons.SMG_KV9,
     mod.Weapons.SMG_PW5A3,
     mod.Weapons.SMG_PW7A2,
@@ -355,9 +407,9 @@ function CreateWeaponList(): any[] {
     mod.Weapons.SMG_SL9,
     mod.Weapons.SMG_UMG_40,
     mod.Weapons.SMG_USG_90,
-  ];
+  ], WeaponType.Weapon);
 
-  const assaultRifles = [
+  const assaultRifles = WrapWeaponType([
     mod.Weapons.AssaultRifle_AK4D,
     mod.Weapons.AssaultRifle_B36A4,
     mod.Weapons.AssaultRifle_KORD_6P67,
@@ -366,9 +418,9 @@ function CreateWeaponList(): any[] {
     mod.Weapons.AssaultRifle_NVO_228E,
     mod.Weapons.AssaultRifle_SOR_556_Mk2,
     mod.Weapons.AssaultRifle_TR_7,
-  ];
+  ], WeaponType.Weapon);
 
-  const carbines = [
+  const carbines = WrapWeaponType([
     mod.Weapons.Carbine_AK_205,
     mod.Weapons.Carbine_GRT_BC,
     mod.Weapons.Carbine_M277,
@@ -376,16 +428,16 @@ function CreateWeaponList(): any[] {
     mod.Weapons.Carbine_M4A1,
     mod.Weapons.Carbine_QBZ_192,
     mod.Weapons.Carbine_SG_553R,
-  ];
+  ], WeaponType.Weapon);
 
-  const dmrs = [
+  const dmrs = WrapWeaponType([
     mod.Weapons.DMR_LMR27,
     mod.Weapons.DMR_M39_EMR,
     mod.Weapons.DMR_SVDM,
     mod.Weapons.DMR_SVK_86,
-  ];
+  ], WeaponType.Weapon);
 
-  const lmgs = [
+  const lmgs = WrapWeaponType([
     mod.Weapons.LMG_DRS_IAR,
     mod.Weapons.LMG_KTS100_MK8,
     mod.Weapons.LMG_L110,
@@ -394,13 +446,17 @@ function CreateWeaponList(): any[] {
     mod.Weapons.LMG_M240L,
     mod.Weapons.LMG_M250,
     mod.Weapons.LMG_RPKM,
-  ];
+  ], WeaponType.Weapon);
 
-  const snipers = [
+  const snipers = WrapWeaponType([
     mod.Weapons.Sniper_M2010_ESR,
     mod.Weapons.Sniper_PSR,
     mod.Weapons.Sniper_SV_98,
-  ];
+  ], WeaponType.Weapon);
+
+  // const rocketLaunchers: WeaponItem[] = WrapWeaponType([
+  //   mod.Gadgets.Launcher_Unguided_Rocket,
+  // ], WeaponType.Gadget, GadgetPosition.GadgetOne);
 
   function PickRandom<T>(arr: T[], n: number): T[] {
     const len = arr.length;
@@ -415,8 +471,9 @@ function CreateWeaponList(): any[] {
     return a.slice(len - n);
   }
 
-  const result = [
+  const result: WeaponItem[] = [
     ...PickRandom(sidearms, 2),
+    // ...PickRandom(rocketLaunchers, 1),
     ...PickRandom(shotguns, 1),
     ...PickRandom(smgs, 2),
     ...PickRandom(assaultRifles, 3),
@@ -429,4 +486,12 @@ function CreateWeaponList(): any[] {
   return result;
 }
 
-// Nice schwanz bro: 56
+function WrapWeaponType(weapons: Array<mod.Weapons | mod.Gadgets>, weaponType: WeaponType, gadgetPosition?: GadgetPosition): WeaponItem[] {
+  return weapons.map(item => ({
+    item,
+    weaponType,
+    gadgetPosition
+  }));
+}
+
+// Nice schwanz bro: 73

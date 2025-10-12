@@ -6,5 +6,7 @@
   "4": "Gun Game",
   "5": "LevelMessage_",
   "6": "Level: {}",
-  "7": "Level up!"
+  "7": "Level up!",
+  "8": "Player {} has reached the last level!",
+  "9": "Player {} won the Game!"
 }
