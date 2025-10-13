@@ -9,6 +9,8 @@ TODO:
 
 To test:
 - [ ] Test time limit with actual players
+- [ ] playerEarnedKill Event triggers on suicide
+
 
 Optional: 
 - [ ] Subtract level when redeploying? -> Team decided no
