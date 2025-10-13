@@ -2,12 +2,11 @@ name: Release on tag
 
 on:
   push:
-    tags:
-      - '*'           # Only run when a tag is pushed
-  workflow_dispatch:  # Optional manual trigger
+    tags: ['*']
+  workflow_dispatch: {}
 
 permissions:
-  contents: write     # Needed to create releases
+  contents: write
 
 jobs:
   release:
@@ -20,99 +19,79 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build
+        run: |
+          npm run build
+          echo "Waiting a few seconds to ensure dist/mod.ts is ready..."
+          sleep 4
+
+      - name: Verify build output
+        run: |
+          if [ ! -f dist/mod.ts ]; then
+            echo "❌ dist/mod.ts not found! Make sure your build outputs it."
+            exit 1
+          fi
+          echo "✅ Found dist/mod.ts"
+
       - name: Determine current and previous tag
         id: tags
         shell: bash
         run: |
-          current="${{ github.ref_name }}"   # e.g. 0.0.3
+          current="${{ github.ref_name }}"
           prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "previous=$prev"   >> "$GITHUB_OUTPUT"
 
-      - name: Build grouped changelog with commit links -> file
+      - name: Build grouped changelog -> file
         id: changelog
         shell: bash
         run: |
           set -euo pipefail
           current="${{ steps.tags.outputs.current }}"
           previous="${{ steps.tags.outputs.previous }}"
-
-          if [ -n "$previous" ]; then
-            range="$previous..$current"
-          else
-            # First tag: include all history reachable by this tag
-            root="$(git rev-list --max-parents=0 "$current")"
-            range="${root}..${current}"
-          fi
-
+          if [ -n "$previous" ]; then range="$previous..$current"; else root="$(git rev-list --max-parents=0 "$current")"; range="${root}..${current}"; fi
           repo_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-
-          # Buckets
-          changed=()
-          added=()
-          deleted=()
-          other=()
-
-          # Read commits safely
-          while IFS=$'\x1f' read -r hash subject || [ -n "${hash:-}" ]; do
-            [ -z "${hash:-}" ] && continue
-            short="${hash:0:7}"
-            line="- [${short}](${repo_url}/commit/${hash}) ${subject}"
-
-            s_lc="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
-
-            if [[ "$s_lc" == *"changed"* || "$s_lc" == *"update"* || "$s_lc" == *"updated"* ]]; then
-              changed+=("$line")
-            elif [[ "$s_lc" == add* || "$s_lc" == *"added"* ]]; then
-              added+=("$line")
-            elif [[ "$s_lc" == delet* || "$s_lc" == *"deleted"* || "$s_lc" == *"remove"* || "$s_lc" == *"removed"* ]]; then
-              deleted+=("$line")
-            else
-              other+=("$line")
-            fi
+          changed=(); added=(); deleted=(); other=()
+          while IFS=$'\x1f' read -r h s || [ -n "${h:-}" ]; do
+            [ -z "${h:-}" ] && continue
+            short="${h:0:7}"
+            line="- [${short}](${repo_url}/commit/${h}) ${s}"
+            slc="$(printf '%s' "$s" | tr '[:upper:]' '[:lower:]')"
+            if [[ "$slc" == *changed* || "$slc" == *update* || "$slc" == *updated* ]]; then changed+=("$line")
+            elif [[ "$slc" == add* || "$slc" == *added* ]]; then added+=("$line")
+            elif [[ "$slc" == delet* || "$slc" == *deleted* || "$slc" == *remove* || "$slc" == *removed* ]]; then deleted+=("$line")
+            else other+=("$line"); fi
           done < <(git log "$range" --pretty=format:'%H%x1f%s')
-
-          # Write markdown body to file
           outfile="CHANGELOG_RELEASE.md"
           {
-            echo "Changelog:"
-            echo
-            if [ ${#changed[@]} -gt 0 ]; then
-              echo "**CHANGED**"
-              printf '%s\n' "${changed[@]}"
-              echo
-            fi
-            if [ ${#added[@]} -gt 0 ]; then
-              echo "**ADDED**"
-              printf '%s\n' "${added[@]}"
-              echo
-            fi
-            if [ ${#deleted[@]} -gt 0 ]; then
-              echo "**DELETED**"
-              printf '%s\n' "${deleted[@]}"
-              echo
-            fi
-            # Include uncategorized only if nothing matched
+            echo "Changelog:"; echo
+            [ ${#changed[@]} -gt 0 ] && { echo "**CHANGED**"; printf '%s\n' "${changed[@]}"; echo; }
+            [ ${#added[@]}   -gt 0 ] && { echo "**ADDED**";   printf '%s\n' "${added[@]}";   echo; }
+            [ ${#deleted[@]} -gt 0 ] && { echo "**DELETED**"; printf '%s\n' "${deleted[@]}"; echo; }
             if [ $(( ${#changed[@]} + ${#added[@]} + ${#deleted[@]} )) -eq 0 ]; then
-              if [ ${#other[@]} -gt 0 ]; then
-                printf '%s\n' "${other[@]}"
-                echo
-              else
-                echo "(No changes found)"
-              fi
+              [ ${#other[@]} -gt 0 ] && { printf '%s\n' "${other[@]}"; echo; } || echo "(No changes found)"
             fi
           } > "$outfile"
-
           echo "body_path=$outfile" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release (published, not draft)
+      - name: Create GitHub Release (published)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tags.outputs.current }}
           name: Gungame v${{ steps.tags.outputs.current }}
           body_path: ${{ steps.changelog.outputs.body_path }}
-          draft: false          # ensure it's published
-          prerelease: false     # mark as a normal release
-          make_latest: true     # set as the latest release
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            dist/mod.ts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
