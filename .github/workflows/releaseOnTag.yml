@@ -25,7 +25,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install   # ✅ instead of npm ci
+        run: npm install
 
       - name: Run build
         run: |
@@ -57,19 +57,32 @@ jobs:
           set -euo pipefail
           current="${{ steps.tags.outputs.current }}"
           previous="${{ steps.tags.outputs.previous }}"
-          if [ -n "$previous" ]; then range="$previous..$current"; else root="$(git rev-list --max-parents=0 "$current")"; range="${root}..${current}"; fi
+          if [ -n "$previous" ]; then
+            range="$previous..$current"
+          else
+            root="$(git rev-list --max-parents=0 "$current")"
+            range="${root}..${current}"
+          fi
+
           repo_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           changed=(); added=(); deleted=(); other=()
+
           while IFS=$'\x1f' read -r h s || [ -n "${h:-}" ]; do
             [ -z "${h:-}" ] && continue
             short="${h:0:7}"
             line="- [${short}](${repo_url}/commit/${h}) ${s}"
             slc="$(printf '%s' "$s" | tr '[:upper:]' '[:lower:]')"
-            if [[ "$slc" == *changed* || "$slc" == *update* || "$slc" == *updated* ]]; then changed+=("$line")
-            elif [[ "$slc" == add* || "$slc" == *added* ]]; then added+=("$line")
-            elif [[ "$slc" == delet* || "$slc" == *deleted* || "$slc" == *remove* || "$slc" == *removed* ]]; then deleted+=("$line")
-            else other+=("$line"); fi
+            if [[ "$slc" == *changed* || "$slc" == *update* || "$slc" == *updated* ]]; then
+              changed+=("$line")
+            elif [[ "$slc" == add* || "$slc" == *added* ]]; then
+              added+=("$line")
+            elif [[ "$slc" == delet* || "$slc" == *deleted* || "$slc" == *remove* || "$slc" == *removed* ]]; then
+              deleted+=("$line")
+            else
+              other+=("$line")
+            fi
           done < <(git log "$range" --pretty=format:'%H%x1f%s')
+
           outfile="CHANGELOG_RELEASE.md"
           {
             echo "Changelog:"; echo
@@ -82,16 +95,30 @@ jobs:
           } > "$outfile"
           echo "body_path=$outfile" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release (published)
+      - name: Prepare renamed release asset
+        id: asset
+        shell: bash
+        run: |
+          repo_name="$(basename '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          tag="${{ steps.tags.outputs.current }}"
+
+          mkdir -p release
+          new_name="${repo_name}-v${tag}.ts"
+          cp dist/mod.ts "release/${new_name}"
+
+          echo "asset_path=release/${new_name}" >> "$GITHUB_OUTPUT"
+          echo "asset_name=${new_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release (published with asset)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tags.outputs.current }}
-          name: Gungame v${{ steps.tags.outputs.current }}
+          name: ${{ github.event.repository.name }} v${{ steps.tags.outputs.current }}
           body_path: ${{ steps.changelog.outputs.body_path }}
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            dist/mod.ts
+            ${{ steps.asset.outputs.asset_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
