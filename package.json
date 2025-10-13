@@ -1,11 +1,17 @@
 {
-  "name": "bf6-portal-builder",
-  "version": "0.0.1",
+  "name": "bf6-gungame",
+  "version": "1.0.0",
   "description": "",
   "scripts": {
     "build": "node scripts/build.ts"
   },
-  "keywords": ["Battlefield 6", "BF 6", "Battlefield Portal"],
-  "author": "Viluron",
-  "license": "ISC"
+  "keywords": [
+    "Battlefield 6", 
+    "BF 6", 
+    "Battlefield Portal", 
+    "GunGame", 
+    "GunMaster"
+  ],
+  "author": "Tasty Syntax",
+  "license": "LGPL-3.0-or-later"
 }
