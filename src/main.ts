@@ -16,6 +16,8 @@ function InitGameMode() {
 
   mod.SetSpawnMode(mod.SpawnModes.AutoSpawn);
   PrepareScoreboardForGame();
+
+  GameModeActive = true;
 }
 
 let timestamp = 0;
@@ -23,17 +25,25 @@ function HandleOngoingPlayer(conditionState: any, eventInfo: any) {
   if (timestamp === mod.GetMatchTimeElapsed()) {
     return;
   }
-   
+
   timestamp = mod.GetMatchTimeElapsed();
 
-  const Time = Math.floor(mod.GetMatchTimeElapsed());
+  // +1 to sync time with time in TAB UI
+  const Time = Math.floor(mod.GetMatchTimeElapsed() + 1);
   const Minutes = Math.floor(Time / 60);
   const Seconds = Time % 60;
 
-  mod.SetUITextLabel(
-    mod.FindUIWidgetWithName("Time"),
-    mod.Message("{} min : {} sec ", Minutes, Seconds)
-  );
+  if (mod.GetMatchTimeElapsed() == 0) {
+    mod.SetUITextLabel(
+      mod.FindUIWidgetWithName("Time"),
+      mod.Message("Game not started!")
+    );
+  } else {
+    mod.SetUITextLabel(
+      mod.FindUIWidgetWithName("Time"),
+      mod.Message("{} min : {} sec ", Minutes, Seconds)
+    );
+  }
 }
 
 function CreateVersionBox() {
@@ -111,7 +121,7 @@ function InitPlayerOnJoin(eventInfo: any) {
     mod.AddUIText(
       "Time",
       mod.CreateVector(0, 0, 0),
-      mod.CreateVector(170, 50, 50),
+      mod.CreateVector(190, 50, 50),
       mod.UIAnchor.TopCenter,
       mod.Message("Match Time: {}", 1),
       eventInfo.eventPlayer
@@ -132,7 +142,6 @@ function InitPlayerOnJoin(eventInfo: any) {
 // Event: Player respawned
 function DeployPlayer(eventInfo: any) {
   SetupPlayer(eventInfo);
-  mod.EnableScreenEffect(eventInfo.eventPlayer, mod.GetScreenEffect(2), true);
   // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(mod.CountOf(mod.AllPlayers()) + 1));
 }
 
@@ -246,12 +255,17 @@ export async function OnPlayerEarnedKill(
     eventWeaponUnlock,
   };
 
+  if (GameModeActive == false) {
+    return;
+  }
+
   HandlePlayerKill(eventInfo);
 
   const playerLevel: number = mod.GetVariable(
     mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
   );
 
+  // Maybe put this into a new function
   if (playerLevel == MAX_LEVEL) {
     if (
       mod.EventDeathTypeCompare(
@@ -313,6 +327,10 @@ export function OnPlayerDied(
 // ########## Game functions ##########//
 
 function EndGame(playerWon: mod.Player) {
+  if (!GameModeActive) {
+    return;
+  }
+
   mod.AddUIText(
     "EndGameWon",
     mod.CreateVector(0, 150, 0),
@@ -342,11 +360,8 @@ function EndGame(playerWon: mod.Player) {
     mod.UIAnchor.Center
   );
 
+  GameModeActive = false;
   mod.EndGameMode(playerWon);
-
-  //Maybe:
-  // await mod.Wait(2);
-  // remove text
 }
 
 function SetupPlayer(eventInfo: any) {
@@ -371,7 +386,6 @@ function SetupPlayer(eventInfo: any) {
     SetKnifeWeapon(eventInfo.eventPlayer);
   }
 
-  // To fix getting Level 0 randomly on join
   UpdateScoreboardForPlayer(
     eventInfo,
     playerLevel,

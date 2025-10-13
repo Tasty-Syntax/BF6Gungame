@@ -22,3 +22,9 @@ enum Variables {
   /** Killcount to keep track of kills in each Weaponlevel */
   KillCount = 1,
 }
+
+/**
+ * GameMode Active
+ */
+
+let GameModeActive = false;
