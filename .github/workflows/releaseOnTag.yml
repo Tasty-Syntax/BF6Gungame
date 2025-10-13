@@ -2,12 +2,13 @@ name: Release on tag
 
 on:
   push:
+    # Only run when a tag is pushed — not on branch pushes
     tags:
-      - '*'           # Trigger on any new tag push
-  workflow_dispatch:  # Allow manual run if needed
+      - '*'           # Matches all tag names like 0.0.1, 1.2.3, etc.
+  workflow_dispatch:  # Optional manual trigger
 
 permissions:
-  contents: write     # Needed to create GitHub releases
+  contents: write     # Needed to create releases
 
 jobs:
   release:
@@ -40,7 +41,7 @@ jobs:
           if [ -n "$previous" ]; then
             range="$previous..$current"
           else
-            # First-ever tag — include all history
+            # First-ever tag: include all commits up to this tag
             range="$current"
           fi
 
