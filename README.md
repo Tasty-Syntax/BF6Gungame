@@ -2,6 +2,10 @@
 
 A classic Gun Game implementation for Battlefield 6 Portal, where players progress through weapon tiers by earning kills and race to be the first to complete all levels.
 
+
+# ‼️  Usage Information ‼️
+**If you end up using our code / scripts please make sure to credit TastySyntax in your gamemode!**
+
 ## 📋 Overview
 
 Gun Game is a team based game mode where players start with basic weapons and must earn kills to progress through increasingly powerful weapon tiers. The first player to complete all weapon levels and achieve the final knife kill wins the match.
