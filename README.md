@@ -3,6 +3,8 @@
 A classic Gun Game implementation for Battlefield 6 Portal, where players progress through weapon tiers by earning kills and race to be the first to complete all levels.  
 
 # Usage Information
+
+> [!IMPORTANT]
 > If you end up using our code / scripts please make sure to credit TastySyntax in your gamemode!
 
 ## Overview
@@ -15,7 +17,7 @@ Gun Game is a team based game mode where players start with basic weapons and mu
 
 - **15 Weapon Levels**: Players must progress through 15 different weapon tiers
 - **2 Kills per Level**: Players need 2 kills with their current weapon to advance to the next level
-- **Final Level**: The last level requires players to use only a combat knife 🔪
+- **Final Level**: The last level requires players to use only a combat knife 
 
 ### Weapon Tiers
 
