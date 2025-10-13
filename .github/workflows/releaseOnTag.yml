@@ -99,7 +99,8 @@ jobs:
         id: asset
         shell: bash
         run: |
-          repo_name="$(basename '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          set -euo pipefail
+          repo_name="$(basename "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
           tag="${{ steps.tags.outputs.current }}"
 
           mkdir -p release
@@ -109,7 +110,29 @@ jobs:
           echo "asset_path=release/${new_name}" >> "$GITHUB_OUTPUT"
           echo "asset_name=${new_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release (published with asset)
+      - name: Package maps and scenes (if present)
+        id: extras
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tags.outputs.current }}"
+          mkdir -p release
+
+          if [ -d maps ]; then
+            echo "📦 Packaging maps/ -> release/maps-v${tag}.zip"
+            zip -r "release/maps-v${tag}.zip" maps > /dev/null
+          else
+            echo "ℹ️ maps/ not found; skipping."
+          fi
+
+          if [ -d scenes ]; then
+            echo "📦 Packaging scenes/ -> release/scenes-v${tag}.zip"
+            zip -r "release/scenes-v${tag}.zip" scenes > /dev/null
+          else
+            echo "ℹ️ scenes/ not found; skipping."
+          fi
+
+      - name: Create GitHub Release (published with assets)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tags.outputs.current }}
@@ -119,6 +142,6 @@ jobs:
           prerelease: false
           make_latest: true
           files: |
-            ${{ steps.asset.outputs.asset_path }}
+            release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
