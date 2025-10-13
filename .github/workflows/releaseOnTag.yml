@@ -2,9 +2,8 @@ name: Release on tag
 
 on:
   push:
-    # Only run when a tag is pushed — not on branch pushes
     tags:
-      - '*'           # Matches all tag names like 0.0.1, 1.2.3, etc.
+      - '*'           # Trigger on any new tag push (e.g., 0.0.3)
   workflow_dispatch:  # Optional manual trigger
 
 permissions:
@@ -12,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    if: github.event.deleted != true   # Skip if the tag was deleted
+    if: github.event.deleted != true
     runs-on: ubuntu-latest
 
     steps:
@@ -31,32 +30,47 @@ jobs:
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "previous=$prev"   >> "$GITHUB_OUTPUT"
 
-      - name: Build changelog
+      - name: Build changelog with commit links
         id: changelog
         shell: bash
         run: |
+          set -euo pipefail
           current="${{ steps.tags.outputs.current }}"
           previous="${{ steps.tags.outputs.previous }}"
 
+          # Determine the commit range
           if [ -n "$previous" ]; then
             range="$previous..$current"
           else
-            # First-ever tag: include all commits up to this tag
+            # First-ever tag — include all history reachable by this tag
             range="$current"
           fi
 
-          log="$(git log "$range" --pretty=format:'- %s')"
+          base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
 
-          if [ -z "$log" ]; then
-            log="No new commits since previous tag."
+          # Use record (0x1e) and field (0x1f) separators to handle any message content safely
+          mapfile -d $'\x1e' records < <(git log "$range" --pretty=format:'%H%x1f%s%x1e' || true)
+
+          body="Changelog:%0A%0A"  # header + blank line (URL-encoded newlines for Actions output)
+          if [ ${#records[@]} -eq 0 ]; then
+            body+="- No changes since previous tag.%0A"
+          else
+            for rec in "${records[@]}"; do
+              # skip empty trailing read
+              [ -z "$rec" ] && continue
+              hash="${rec%%$'\x1f'*}"
+              subject="${rec#*$'\x1f'}"
+              short="${hash:0:7}"
+              line="- [${short}](${base_url}/commit/${hash}) ${subject}"
+              # Percent-escape for GitHub Actions output
+              line="${line//'%'/'%25'}"
+              line="${line//$'\n'/'%0A'}"
+              line="${line//$'\r'/'%0D'}"
+              body+="${line}%0A"
+            done
           fi
 
-          # Escape for GitHub Actions output
-          log="${log//'%'/'%25'}"
-          log="${log//$'\n'/'%0A'}"
-          log="${log//$'\r'/'%0D'}"
-
-          echo "body=$log" >> "$GITHUB_OUTPUT"
+          echo "body=${body}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
