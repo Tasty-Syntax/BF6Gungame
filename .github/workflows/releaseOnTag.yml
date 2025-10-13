@@ -3,7 +3,7 @@ name: Release on tag
 on:
   push:
     tags:
-      - '*'           # Trigger on any new tag push (e.g., 0.0.3)
+      - '*'           # Only run when a tag is pushed
   workflow_dispatch:  # Optional manual trigger
 
 permissions:
@@ -26,11 +26,10 @@ jobs:
         run: |
           current="${{ github.ref_name }}"   # e.g. 0.0.3
           prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
-
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "previous=$prev"   >> "$GITHUB_OUTPUT"
 
-      - name: Build changelog with commit links
+      - name: Build grouped changelog with commit links (multiline)
         id: changelog
         shell: bash
         run: |
@@ -38,39 +37,80 @@ jobs:
           current="${{ steps.tags.outputs.current }}"
           previous="${{ steps.tags.outputs.previous }}"
 
-          # Determine the commit range
+          # Determine commit range
           if [ -n "$previous" ]; then
             range="$previous..$current"
           else
-            # First-ever tag — include all history reachable by this tag
-            range="$current"
+            # First tag: include all history reachable by this tag
+            root="$(git rev-list --max-parents=0 "$current")"
+            range="${root}..${current}"
           fi
 
-          base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          repo_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
 
-          # Use record (0x1e) and field (0x1f) separators to handle any message content safely
-          mapfile -d $'\x1e' records < <(git log "$range" --pretty=format:'%H%x1f%s%x1e' || true)
+          # Buckets
+          changed=()
+          added=()
+          deleted=()
+          other=()
 
-          body="Changelog:%0A%0A"  # header + blank line (URL-encoded newlines for Actions output)
-          if [ ${#records[@]} -eq 0 ]; then
-            body+="- No changes since previous tag.%0A"
-          else
-            for rec in "${records[@]}"; do
-              # skip empty trailing read
-              [ -z "$rec" ] && continue
-              hash="${rec%%$'\x1f'*}"
-              subject="${rec#*$'\x1f'}"
-              short="${hash:0:7}"
-              line="- [${short}](${base_url}/commit/${hash}) ${subject}"
-              # Percent-escape for GitHub Actions output
-              line="${line//'%'/'%25'}"
-              line="${line//$'\n'/'%0A'}"
-              line="${line//$'\r'/'%0D'}"
-              body+="${line}%0A"
-            done
+          # Read commits safely (handles any characters)
+          while IFS=$'\x1f' read -r hash subject || [ -n "$hash" ]; do
+            [ -z "${hash:-}" ] && continue
+            short="${hash:0:7}"
+            line="- [${short}](${repo_url}/commit/${hash}) ${subject}"
+
+            s_lc="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
+
+            if [[ "$s_lc" == *"changed"* || "$s_lc" == *"update"* || "$s_lc" == *"updated"* ]]; then
+              changed+=("$line")
+            elif [[ "$s_lc" == adde*: || "$s_lc" == *"added"* ]]; then
+              added+=("$line")
+            elif [[ "$s_lc" == delet*: || "$s_lc" == *"deleted"* ]]; then
+              deleted+=("$line")
+            else
+              other+=("$line")
+            fi
+          done < <(git log "$range" --pretty=format:'%H%x1f%s')
+
+          body="Changelog:\n\n"
+
+          # Emit in requested order: CHANGED, ADDED, DELETED
+          if [ ${#changed[@]} -gt 0 ]; then
+            body+="**CHANGED**\n"
+            for i in "${changed[@]}"; do body+="$i\n"; done
+            body+="\n"
           fi
 
-          echo "body=${body}" >> "$GITHUB_OUTPUT"
+          if [ ${#added[@]} -gt 0 ]; then
+            body+="**ADDED**\n"
+            for i in "${added[@]}"; do body+="$i\n"; done
+            body+="\n"
+          fi
+
+          if [ ${#deleted[@]} -gt 0 ]; then
+            body+="**DELETED**\n"
+            for i in "${deleted[@]}"; do body+="$i\n"; done
+            body+="\n"
+          fi
+
+          # Optionally include uncategorized commits if any
+          if [ ${#other[@]} -gt 0 ]; then
+            body+="**OTHER**\n"
+            for i in "${other[@]}"; do body+="$i\n"; done
+            body+="\n"
+          fi
+
+          if [ "${#changed[@]}${#added[@]}${#deleted[@]}${#other[@]}" = "0000" ]; then
+            body+="(No changes found)\n"
+          fi
+
+          {
+            echo "body<<'EOF'"
+            printf "%s" "$body"
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
