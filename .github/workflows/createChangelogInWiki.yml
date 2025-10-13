@@ -44,12 +44,14 @@ jobs:
         run: |
           current="${{ steps.res.outputs.tag }}"
           prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
+
           # Prefer annotated tag date; fallback to commit date
           tag_date_iso="$(git for-each-ref --format='%(taggerdate:iso8601)' "refs/tags/${current}")"
           if [ -z "$tag_date_iso" ]; then
             tag_date_iso="$(git log -1 --format=%cI "${current}")"
           fi
-          # Human-friendly UTC
+
+          # Human-friendly UTC (you can switch to Europe/Berlin if you prefer)
           tag_date_human="$(date -u -d "$tag_date_iso" '+%A, %d %B %Y at %H:%M UTC')"
 
           echo "current=$current"               >> "$GITHUB_OUTPUT"
@@ -106,7 +108,7 @@ jobs:
 
           echo "body_path=$out" >> "$GITHUB_OUTPUT"
 
-      - name: Update GitHub Wiki (nest under Changelog, internal links, tidy)
+      - name: Update GitHub Wiki (true nesting under Changelog + internal links)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -119,73 +121,82 @@ jobs:
           WIKI_URL="https://${GITHUB_ACTOR}:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
           git clone --depth 1 "$WIKI_URL" wiki
 
-          # Ensure Changelog folder exists and move version page there
+          # Ensure folder & index page for the Changelog section
           mkdir -p "wiki/Changelog"
+
+          # Folder index: Changelog/Home.md (this is the canonical parent page)
+          folder_index="wiki/Changelog/Home.md"
+          {
+            echo "# Changelog"
+            echo
+            echo "This section lists all release notes by version."
+            echo
+            # Prepend the newest version at top; then render existing entries (if any)
+            echo "- [[Changelog/${current}|v${current}]] — ${idx_date}"
+            echo
+            if [ -f "$folder_index" ]; then
+              # Append previous lines from existing Home.md, skipping the header line
+              tail -n +2 "$folder_index" | sed '/^\s*$/N;/^\n$/D' || true
+            fi
+          } > "wiki/_new_home.md"
+          mv "wiki/_new_home.md" "$folder_index"
+
+          # Also keep a minimal root Changelog.md that points to the folder index (optional, nice UX)
+          root_index="wiki/Changelog.md"
+          {
+            echo "# Changelog"
+            echo
+            echo "See the full list at [[Changelog|Changelog (folder index)]]."
+          } > "$root_index"
+
+          # Version page under the Changelog folder
           cp "$outfile" "wiki/Changelog/${current}.md"
 
-          # ✨ Clean up any accidentally created root-level version page
+          # Remove any stray root-level version page so it doesn't appear loose
           if [ -f "wiki/${current}.md" ]; then
             git -C wiki rm -f "${current}.md" || rm -f "wiki/${current}.md" || true
           fi
 
-          # Update Changelog index with INTERNAL wiki link (renders page, not raw)
-          index="wiki/Changelog.md"
-          if [ -f "$index" ]; then
-            awk -v cur="Changelog/${current}.md" 'index($0, cur){next}{print}' "$index" > wiki/_old_index.md
-          else
-            echo "# Changelog" > wiki/_old_index.md
-            echo >> wiki/_old_index.md
-          fi
-          {
-            if ! head -n1 wiki/_old_index.md | grep -qi '^# Changelog'; then
-              echo "# Changelog"; echo
-            else
-              head -n1 wiki/_old_index.md; echo
-            fi
-            # [[Page|Alias]] ensures wiki-rendered navigation instead of raw file links
-            echo "- **v${current}** — ${idx_date} — [[Changelog/${current}|Notes]]"
-            echo
-            tail -n +2 wiki/_old_index.md || true
-          } > "$index"
-          rm -f wiki/_old_index.md
-
-          # Update _Sidebar.md to group under a Changelog section (use internal link)
+          # Update _Sidebar to include a Changelog section and link to the folder index + latest one
           sidebar="wiki/_Sidebar.md"
-          link="* [[Changelog/${current}|v${current}]] — ${idx_date}"
-
+          link_latest="* [[Changelog/${current}|v${current}]] — ${idx_date}"
           if [ -f "$sidebar" ]; then
-            awk -v L="$link" -v cur="Changelog/${current}.md" '
-              BEGIN{added=0}
+            awk -v latest="$link_latest" '
+              BEGIN{added_index=0; added_latest=0}
               tolower($0) ~ /^## changelog/ {
                 print $0
-                if (added==0) { print ""; print L; added=1 }
+                if (added_index==0){ print ""; print "* [[Changelog|Changelog index]]"; added_index=1 }
+                if (added_latest==0){ print latest; added_latest=1 }
                 next
               }
-              index($0, cur){ next }  # drop existing duplicate link lines
+              # drop duplicate lines pointing to this version
+              index($0, "Changelog/") && index($0, "] —") { next }
               { print }
               END{
-                if (added==0){
+                if (added_index==0 || added_latest==0){
                   print ""
                   print "## Changelog"
                   print ""
-                  print L
+                  if (added_index==0)  print "* [[Changelog|Changelog index]]"
+                  if (added_latest==0) print latest
                 }
               }
-            ' "$sidebar" > wiki/_Sidebar.new.md
+            ' "$sidebar" > "wiki/_Sidebar.new.md"
           else
             {
               echo "## Changelog"
               echo
-              echo "$link"
+              echo "* [[Changelog|Changelog index]]"
+              echo "$link_latest"
               echo
-            } > wiki/_Sidebar.new.md
+            } > "wiki/_Sidebar.new.md"
           fi
-          mv wiki/_Sidebar.new.md "$sidebar"
+          mv "wiki/_Sidebar.new.md" "$sidebar"
 
           pushd wiki >/dev/null
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Changelog/${current}.md" "Changelog.md" "_Sidebar.md" || true
-          git commit -m "Wiki: add changelog for ${current} (nested + internal links)" || echo "No wiki changes to commit."
+          git add "Changelog/${current}.md" "Changelog/Home.md" "Changelog.md" "_Sidebar.md" || true
+          git commit -m "Wiki: nest v${current} under Changelog (folder index + internal links)" || echo "No wiki changes to commit."
           git push
           popd >/dev/null
