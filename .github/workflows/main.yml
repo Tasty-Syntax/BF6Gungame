@@ -1,0 +1,81 @@
+name: Auto release from commits since last tag
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed for tagging and creating releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get last tag
+        id: last
+        run: |
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "last_tag=$last_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog since last tag
+        id: changelog
+        run: |
+          if [ -n "${{ steps.last.outputs.last_tag }}" ]; then
+            range="${{ steps.last.outputs.last_tag }}..HEAD"
+            log=$(git log "$range" --pretty=format:'- %s')
+          else
+            log=$(git log --pretty=format:'- %s')
+          fi
+
+          if [ -z "$log" ]; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            echo "No new commits since last tag."
+            exit 0
+          fi
+
+          # Escape for GitHub Actions
+          log="${log//'%'/'%25'}"
+          log="${log//$'\n'/'%0A'}"
+          log="${log//$'\r'/'%0D'}"
+
+          echo "empty=false" >> "$GITHUB_OUTPUT"
+          echo "body=$log" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next tag (patch bump)
+        id: next
+        if: steps.changelog.outputs.empty != 'true'
+        run: |
+          last="${{ steps.last.outputs.last_tag }}"
+          if [ -z "$last" ]; then
+            echo "tag=0.0.1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IFS='.' read -r major minor patch <<< "$last"
+          patch=$((patch + 1))
+          echo "tag=${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push new tag
+        if: steps.changelog.outputs.empty != 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.next.outputs.tag }}"
+          git push origin "${{ steps.next.outputs.tag }}"
+
+      - name: Create GitHub Release
+        if: steps.changelog.outputs.empty != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next.outputs.tag }}
+          name: Release ${{ steps.next.outputs.tag }}
+          body: ${{ steps.changelog.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
