@@ -19,14 +19,14 @@ type PlayerDied = {
 
 enum WeaponType {
   Weapon,
-  Gadget
-};
+  Gadget,
+}
 
 enum GadgetPosition {
   GadgetOne = mod.InventorySlots.GadgetOne,
   GadgetTwo = mod.InventorySlots.GadgetTwo,
   MiscGadget = mod.InventorySlots.MiscGadget,
-  ClassGadget = mod.InventorySlots.ClassGadget
+  ClassGadget = mod.InventorySlots.ClassGadget,
 }
 
 type WeaponItem = {
@@ -51,7 +51,7 @@ const MAX_LEVEL = 15;
 /**
  * Gamemode Version
  */
-const VERSION = "0.0.100"
+const VERSION = "1.0.0";
 
 /**
  * Variable IDs
@@ -69,13 +69,7 @@ enum Variables {
 
 // Event: Game mode started
 function InitGameMode() {
-  mod.AddUIText(
-    "EndGameWon",
-    mod.CreateVector(10, 10, 10),
-    mod.CreateVector(50, 50, 50),
-    mod.UIAnchor.TopRight,
-    mod.Message("{}", VERSION)
-  );
+  CreateVersionBox();
   Weapons = CreateWeaponList();
   mod.EnableHQ(mod.GetHQ(0), true);
   // mod.SetHQTeam(mod.GetHQ(0), mod.GetTeam(0));
@@ -103,13 +97,29 @@ function HandleOngoingPlayer(conditionState: any, eventInfo: any) {
 
   mod.SetUITextLabel(
     mod.FindUIWidgetWithName("Time"),
-    mod.Message("Time: {}", `${Minutes}:${Seconds}`)
+    mod.Message("{} min : {} sec ", Minutes, Seconds)
   );
+}
+
+function CreateVersionBox() {
+  mod.AddUIText(
+    "VersionBox",
+    mod.CreateVector(15, 5, 10),
+    mod.CreateVector(100, 50, 50),
+    mod.UIAnchor.TopRight,
+    mod.Message("v{}", VERSION)
+  );
+  mod.SetUITextSize(mod.FindUIWidgetWithName("VersionBox"), 20);
+  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("VersionBox"), 0);
 }
 
 function PrepareScoreboardForGame() {
   mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
-  mod.SetScoreboardColumnNames(mod.Message("Level"), mod.Message("Kills"), mod.Message("Deaths"));
+  mod.SetScoreboardColumnNames(
+    mod.Message("Level"),
+    mod.Message("Kills"),
+    mod.Message("Deaths")
+  );
   mod.SetScoreboardColumnWidths(1, 1, 1, 0, 0);
   mod.SetScoreboardHeader(mod.Message("Gun Game"));
   mod.SetScoreboardSorting(1, false);
@@ -119,8 +129,8 @@ function PrepareScoreboardForGame() {
 
 function UpdateScoreboardForPlayer(
   eventInfo: any,
-  killCount: number,
   playerLevel: number,
+  killCount: number,
   deathCount: number
 ) {
   mod.SetScoreboardPlayerValues(
@@ -131,12 +141,15 @@ function UpdateScoreboardForPlayer(
   );
 }
 
-
 // Event: Player joined - Setup player
 function InitPlayerOnJoin(eventInfo: any) {
   // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(2))
 
-  if (!mod.FindUIWidgetWithName("LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer))) {
+  if (
+    !mod.FindUIWidgetWithName(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+    )
+  ) {
     mod.AddUIText(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
       mod.CreateVector(0, 0, 0),
@@ -163,19 +176,14 @@ function InitPlayerOnJoin(eventInfo: any) {
     mod.AddUIText(
       "Time",
       mod.CreateVector(0, 0, 0),
-      mod.CreateVector(150, 50, 50),
+      mod.CreateVector(160, 50, 50),
       mod.UIAnchor.TopCenter,
-      mod.Message("Time: {}", 1),
+      mod.Message("Match Time: {}", 1),
       eventInfo.eventPlayer
     );
-    mod.SetUIWidgetBgAlpha(
-      mod.FindUIWidgetWithName("Time"),
-      0.25
-    );
-    mod.SetUITextSize(
-      mod.FindUIWidgetWithName("Time"),
-      30
-    );
+    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("Time"), 0.5);
+    mod.SetUITextSize(mod.FindUIWidgetWithName("Time"), 25);
+    mod.SetUITextAnchor(mod.FindUIWidgetWithName("Time"), mod.UIAnchor.Center);
   }
 
   UpdateScoreboardForPlayer(
@@ -189,6 +197,7 @@ function InitPlayerOnJoin(eventInfo: any) {
 // Event: Player respawned
 function DeployPlayer(eventInfo: any) {
   SetupPlayer(eventInfo);
+  mod.EnableScreenEffect(eventInfo.eventPlayer, mod.GetScreenEffect(2), true);
   // mod.SetTeam(eventInfo.eventPlayer, mod.GetTeam(mod.CountOf(mod.AllPlayers()) + 1));
 }
 
@@ -224,6 +233,11 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
     mod.DisplayHighlightedWorldLogMessage(
       mod.Message("Level up!"),
       eventInfo.eventPlayer
+    );
+    PlaySoundPlayer(
+      eventInfo.eventPlayer,
+      mod.RuntimeSpawn_Common.SFX_UI_EOR_RankUp_Normal_OneShot2D,
+      500
     );
 
     mod.SetUITextLabel(
@@ -267,7 +281,10 @@ export function OnGameModeStarted() {
 export function OngoingPlayer(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer: eventPlayer };
   let eventNum = 0;
-  HandleOngoingPlayer(modlib.getPlayerCondition(eventPlayer, eventNum++), eventInfo);
+  HandleOngoingPlayer(
+    modlib.getPlayerCondition(eventPlayer, eventNum++),
+    eventInfo
+  );
 }
 
 export function OnPlayerJoinGame(eventPlayer: mod.Player) {
@@ -281,7 +298,7 @@ export function OnPlayerDeployed(eventPlayer: mod.Player) {
   DeployPlayer(eventInfo);
 }
 
-export function OnPlayerEarnedKill(
+export async function OnPlayerEarnedKill(
   eventPlayer: mod.Player,
   eventOtherPlayer: mod.Player,
   eventDeathType: mod.DeathType,
@@ -295,6 +312,42 @@ export function OnPlayerEarnedKill(
   };
 
   HandlePlayerKill(eventInfo);
+
+  const playerLevel: number = mod.GetVariable(
+    mod.ObjectVariable(eventInfo.eventPlayer, Variables.PlayerLevel)
+  );
+
+  if (playerLevel == MAX_LEVEL) {
+    mod.AddUIText(
+      "FinalLevel",
+      mod.CreateVector(0, 250, 0),
+      mod.CreateVector(600, 50, 50),
+      mod.UIAnchor.TopCenter,
+      mod.Message(
+        "Player {} has reached the last level!",
+        eventInfo.eventPlayer
+      )
+    );
+    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("FinalLevel"), 0.5);
+    mod.SetUITextSize(mod.FindUIWidgetWithName("FinalLevel"), 25);
+    mod.SetUIWidgetBgColor(
+      mod.FindUIWidgetWithName("FinalLevel"),
+      mod.CreateVector(1, 0.5, 0)
+    );
+    mod.SetUITextAnchor(
+      mod.FindUIWidgetWithName("FinalLevel"),
+      mod.UIAnchor.Center
+    );
+
+    PlaySound(mod.RuntimeSpawn_Common.SFX_UI_Matchmaking_Start_OneShot2D, 1000);
+    PlaySound(
+      mod.RuntimeSpawn_Common.SFX_UI_Notification_SectorTaken_Reveal_OneShot2D,
+      1000
+    );
+
+    await mod.Wait(5);
+    mod.DeleteUIWidget(mod.FindUIWidgetWithName("FinalLevel"));
+  }
 }
 
 export function OnPlayerDied(
@@ -318,25 +371,32 @@ export function OnPlayerDied(
 function EndGame(playerWon: mod.Player) {
   mod.AddUIText(
     "EndGameWon",
-    mod.CreateVector(-50, 150, 0),
-    mod.CreateVector(150, 50, 50),
+    mod.CreateVector(0, 150, 0),
+    mod.CreateVector(1000, 50, 50),
     mod.UIAnchor.TopCenter,
     mod.Message("{}", playerWon)
   );
 
   mod.AddUIText(
     "WonTheGame",
-    mod.CreateVector(55, 250, 0),
+    mod.CreateVector(0, 250, 0),
     mod.CreateVector(535, 50, 50),
     mod.UIAnchor.TopCenter,
     mod.Message("has won the Game!")
   );
 
-
   mod.SetUITextSize(mod.FindUIWidgetWithName("EndGameWon"), 70);
+  mod.SetUITextAnchor(
+    mod.FindUIWidgetWithName("EndGameWon"),
+    mod.UIAnchor.Center
+  );
   mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("EndGameWon"), 0);
   mod.SetUITextSize(mod.FindUIWidgetWithName("WonTheGame"), 70);
   mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("WonTheGame"), 0);
+  mod.SetUITextAnchor(
+    mod.FindUIWidgetWithName("WonTheGame"),
+    mod.UIAnchor.Center
+  );
 
   mod.EndGameMode(playerWon);
 
@@ -364,13 +424,6 @@ function SetupPlayer(eventInfo: any) {
     // mod.AddEquipment(eventInfo.eventPlayer, );
     // mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
   } else {
-    mod.DisplayNotificationMessage(
-      mod.Message(
-        "Player {} has reached the last level!",
-        eventInfo.eventPlayer
-      )
-    );
-
     SetKnifeWeapon(eventInfo.eventPlayer);
   }
 
@@ -406,7 +459,11 @@ function Equip(item: WeaponItem, player: mod.Player) {
   mod.AddEquipment(player, mod.Gadgets.Melee_Combat_Knife);
 }
 
-function EquipGadget(player: mod.Player, gadget: mod.Gadgets, gadgetPosition: number = 1) {
+function EquipGadget(
+  player: mod.Player,
+  gadget: mod.Gadgets,
+  gadgetPosition: number = 1
+) {
   UnequipAll(player);
   mod.AddEquipment(player, gadget, mod.InventorySlots.GadgetOne);
   mod.ForceSwitchInventory(player, mod.InventorySlots.GadgetOne);
@@ -460,74 +517,98 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
 }
 
 function CreateWeaponList(): WeaponItem[] {
-  const sidearms = WrapWeaponType([
-    mod.Weapons.Sidearm_ES_57,
-    mod.Weapons.Sidearm_M44,
-    mod.Weapons.Sidearm_M45A1,
-    mod.Weapons.Sidearm_P18,
-  ], WeaponType.Weapon);
+  const sidearms = WrapWeaponType(
+    [
+      mod.Weapons.Sidearm_ES_57,
+      mod.Weapons.Sidearm_M44,
+      mod.Weapons.Sidearm_M45A1,
+      mod.Weapons.Sidearm_P18,
+    ],
+    WeaponType.Weapon
+  );
 
-  const shotguns = WrapWeaponType([
-    mod.Weapons.Shotgun__185KS_K,
-    mod.Weapons.Shotgun_M1014,
-    mod.Weapons.Shotgun_M87A1,
-  ], WeaponType.Weapon);
+  const shotguns = WrapWeaponType(
+    [
+      mod.Weapons.Shotgun__185KS_K,
+      mod.Weapons.Shotgun_M1014,
+      mod.Weapons.Shotgun_M87A1,
+    ],
+    WeaponType.Weapon
+  );
 
-  const smgs = WrapWeaponType([
-    mod.Weapons.SMG_KV9,
-    mod.Weapons.SMG_PW5A3,
-    mod.Weapons.SMG_PW7A2,
-    mod.Weapons.SMG_SCW_10,
-    mod.Weapons.SMG_SGX,
-    mod.Weapons.SMG_SL9,
-    mod.Weapons.SMG_UMG_40,
-    mod.Weapons.SMG_USG_90,
-  ], WeaponType.Weapon);
+  const smgs = WrapWeaponType(
+    [
+      mod.Weapons.SMG_KV9,
+      mod.Weapons.SMG_PW5A3,
+      mod.Weapons.SMG_PW7A2,
+      mod.Weapons.SMG_SCW_10,
+      mod.Weapons.SMG_SGX,
+      mod.Weapons.SMG_SL9,
+      mod.Weapons.SMG_UMG_40,
+      mod.Weapons.SMG_USG_90,
+    ],
+    WeaponType.Weapon
+  );
 
-  const assaultRifles = WrapWeaponType([
-    mod.Weapons.AssaultRifle_AK4D,
-    mod.Weapons.AssaultRifle_B36A4,
-    mod.Weapons.AssaultRifle_KORD_6P67,
-    mod.Weapons.AssaultRifle_L85A3,
-    mod.Weapons.AssaultRifle_M433,
-    mod.Weapons.AssaultRifle_NVO_228E,
-    mod.Weapons.AssaultRifle_SOR_556_Mk2,
-    mod.Weapons.AssaultRifle_TR_7,
-  ], WeaponType.Weapon);
+  const assaultRifles = WrapWeaponType(
+    [
+      mod.Weapons.AssaultRifle_AK4D,
+      mod.Weapons.AssaultRifle_B36A4,
+      mod.Weapons.AssaultRifle_KORD_6P67,
+      mod.Weapons.AssaultRifle_L85A3,
+      mod.Weapons.AssaultRifle_M433,
+      mod.Weapons.AssaultRifle_NVO_228E,
+      mod.Weapons.AssaultRifle_SOR_556_Mk2,
+      mod.Weapons.AssaultRifle_TR_7,
+    ],
+    WeaponType.Weapon
+  );
 
-  const carbines = WrapWeaponType([
-    mod.Weapons.Carbine_AK_205,
-    mod.Weapons.Carbine_GRT_BC,
-    mod.Weapons.Carbine_M277,
-    mod.Weapons.Carbine_M417_A2,
-    mod.Weapons.Carbine_M4A1,
-    mod.Weapons.Carbine_QBZ_192,
-    mod.Weapons.Carbine_SG_553R,
-  ], WeaponType.Weapon);
+  const carbines = WrapWeaponType(
+    [
+      mod.Weapons.Carbine_AK_205,
+      mod.Weapons.Carbine_GRT_BC,
+      mod.Weapons.Carbine_M277,
+      mod.Weapons.Carbine_M417_A2,
+      mod.Weapons.Carbine_M4A1,
+      mod.Weapons.Carbine_QBZ_192,
+      mod.Weapons.Carbine_SG_553R,
+    ],
+    WeaponType.Weapon
+  );
 
-  const dmrs = WrapWeaponType([
-    mod.Weapons.DMR_LMR27,
-    mod.Weapons.DMR_M39_EMR,
-    mod.Weapons.DMR_SVDM,
-    mod.Weapons.DMR_SVK_86,
-  ], WeaponType.Weapon);
+  const dmrs = WrapWeaponType(
+    [
+      mod.Weapons.DMR_LMR27,
+      mod.Weapons.DMR_M39_EMR,
+      mod.Weapons.DMR_SVDM,
+      mod.Weapons.DMR_SVK_86,
+    ],
+    WeaponType.Weapon
+  );
 
-  const lmgs = WrapWeaponType([
-    mod.Weapons.LMG_DRS_IAR,
-    mod.Weapons.LMG_KTS100_MK8,
-    mod.Weapons.LMG_L110,
-    mod.Weapons.LMG_M_60,
-    mod.Weapons.LMG_M123K,
-    mod.Weapons.LMG_M240L,
-    mod.Weapons.LMG_M250,
-    mod.Weapons.LMG_RPKM,
-  ], WeaponType.Weapon);
+  const lmgs = WrapWeaponType(
+    [
+      mod.Weapons.LMG_DRS_IAR,
+      mod.Weapons.LMG_KTS100_MK8,
+      mod.Weapons.LMG_L110,
+      mod.Weapons.LMG_M_60,
+      mod.Weapons.LMG_M123K,
+      mod.Weapons.LMG_M240L,
+      mod.Weapons.LMG_M250,
+      mod.Weapons.LMG_RPKM,
+    ],
+    WeaponType.Weapon
+  );
 
-  const snipers = WrapWeaponType([
-    mod.Weapons.Sniper_M2010_ESR,
-    mod.Weapons.Sniper_PSR,
-    mod.Weapons.Sniper_SV_98,
-  ], WeaponType.Weapon);
+  const snipers = WrapWeaponType(
+    [
+      mod.Weapons.Sniper_M2010_ESR,
+      mod.Weapons.Sniper_PSR,
+      mod.Weapons.Sniper_SV_98,
+    ],
+    WeaponType.Weapon
+  );
 
   // const rocketLaunchers: WeaponItem[] = WrapWeaponType([
   //   mod.Gadgets.Launcher_Unguided_Rocket,
@@ -561,10 +642,40 @@ function CreateWeaponList(): WeaponItem[] {
   return result;
 }
 
-function WrapWeaponType(weapons: Array<mod.Weapons | mod.Gadgets>, weaponType: WeaponType, gadgetPosition?: GadgetPosition): WeaponItem[] {
-  return weapons.map(item => ({
+function PlaySound(SoundEffect: any, Volume: number = 100) {
+  var StartSFX = mod.SpawnObject(
+    SoundEffect,
+    mod.CreateVector(0, 0, 0),
+    mod.CreateVector(0, 0, 0),
+    mod.CreateVector(0, 0, 0)
+  );
+  mod.EnableSFX(StartSFX, true);
+  mod.PlaySound(StartSFX, Volume);
+}
+
+function PlaySoundPlayer(
+  player: mod.Player,
+  SoundEffect: any,
+  Volume: number = 100
+) {
+  var StartSFX = mod.SpawnObject(
+    SoundEffect,
+    mod.CreateVector(0, 0, 0),
+    mod.CreateVector(0, 0, 0),
+    mod.CreateVector(0, 0, 0)
+  );
+  mod.EnableSFX(StartSFX, true);
+  mod.PlaySound(StartSFX, Volume, player);
+}
+
+function WrapWeaponType(
+  weapons: Array<mod.Weapons | mod.Gadgets>,
+  weaponType: WeaponType,
+  gadgetPosition?: GadgetPosition
+): WeaponItem[] {
+  return weapons.map((item) => ({
     item,
     weaponType,
-    gadgetPosition
+    gadgetPosition,
   }));
 }
