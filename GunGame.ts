@@ -326,7 +326,7 @@ export async function OnPlayerEarnedKill(
     ) {
       return;
     }
-    
+
     mod.AddUIText(
       "FinalLevel",
       mod.CreateVector(0, 250, 0),

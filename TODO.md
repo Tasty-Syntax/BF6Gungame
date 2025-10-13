@@ -1,7 +1,7 @@
 TODO:
 - [ ] Delete dropped equipment kits
 - [ ] Defi is not selected when lvl 16 and respawning
-- [ ] Add win message
+- [X] Add win message
 - [ ] Gadgets as Levels
 - [ ] Knife Kill Level Up Changes weapon but doesn't equip it
 - [ ] Knife Kill Takedown (animation) Level up removes all weapons -> on respawn correct weapon is set
@@ -12,3 +12,4 @@ To test:
 
 Optional: 
 - [ ] Subtract level when redeploying? -> Team decided no
+- [X] Deaths on Scoreboard
