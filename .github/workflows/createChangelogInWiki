@@ -1,0 +1,151 @@
+name: Wiki changelog on tag
+
+on:
+  push:
+    tags: ['*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to document (e.g., 0.0.3). If omitted, uses the pushed tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  wiki:
+    if: github.event.deleted != true
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout full history (with tags)
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Resolve tag (push vs manual)
+        id: res
+        shell: bash
+        run: |
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then tag="${{ github.ref_name }}"; fi
+          # ensure tag exists locally
+          git fetch --tags --force
+          if ! git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag '${tag}' not found." >&2; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Determine previous tag and tag timestamp
+        id: tags
+        shell: bash
+        run: |
+          current="${{ steps.res.outputs.tag }}"
+          prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
+
+          # Tag timestamp (prefer annotated tagger date; fallback to commit date)
+          tag_date_iso="$(git for-each-ref --format='%(taggerdate:iso8601)' "refs/tags/${current}")"
+          if [ -z "$tag_date_iso" ]; then
+            tag_date_iso="$(git log -1 --format=%cI "${current}")"
+          fi
+          tag_date_human="$(date -u -d "$tag_date_iso" '+%Y-%m-%d %H:%M:%SZ')"
+
+          echo "current=$current"       >> "$GITHUB_OUTPUT"
+          echo "previous=$prev"         >> "$GITHUB_OUTPUT"
+          echo "tag_date_iso=$tag_date_iso"     >> "$GITHUB_OUTPUT"
+          echo "tag_date_human=$tag_date_human" >> "$GITHUB_OUTPUT"
+
+      - name: Build grouped changelog (with author & commit date) -> file
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="${{ steps.tags.outputs.current }}"
+          previous="${{ steps.tags.outputs.previous }}"
+
+          if [ -n "$previous" ]; then range="$previous..$current"; else root="$(git rev-list --max-parents=0 "$current")"; range="${root}..${current}"; fi
+
+          repo_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+
+          changed=(); added=(); deleted=(); other=()
+
+          # %H hash, %s subject, %an author name, %aI author date (ISO 8601)
+          while IFS=$'\x1f' read -r h s an ad || [ -n "${h:-}" ]; do
+            [ -z "${h:-}" ] && continue
+            short="${h:0:7}"
+            # line: - [abc1234](link) message — _by Author on 2025-10-13T12:34:56Z_
+            line="- [${short}](${repo_url}/commit/${h}) ${s} — _by ${an} on ${ad}_"
+            slc="$(printf '%s' "$s" | tr '[:upper:]' '[:lower:]')"
+
+            if [[ "$slc" == *changed* || "$slc" == *update* || "$slc" == *updated* ]]; then changed+=("$line")
+            elif [[ "$slc" == add* || "$slc" == *added* ]]; then added+=("$line")
+            elif [[ "$slc" == delet* || "$slc" == *deleted* || "$slc" == *remove* || "$slc" == *removed* ]]; then deleted+=("$line")
+            else other+=("$line"); fi
+          done < <(git log "$range" --pretty=format:'%H%x1f%s%x1f%an%x1f%aI')
+
+          out="CHANGELOG_${current}.md"
+          {
+            echo "# Gungame v${current}"
+            echo
+            echo "_Tag created at: **${{ steps.tags.outputs.tag_date_human }}** (ISO: \`${{ steps.tags.outputs.tag_date_iso }}\`)_"
+            echo
+            echo "Changelog:"
+            echo
+            [ ${#changed[@]} -gt 0 ] && { echo "**CHANGED**"; printf '%s\n' "${changed[@]}"; echo; }
+            [ ${#added[@]}   -gt 0 ] && { echo "**ADDED**";   printf '%s\n' "${added[@]}";   echo; }
+            [ ${#deleted[@]} -gt 0 ] && { echo "**DELETED**"; printf '%s\n' "${deleted[@]}"; echo; }
+            if [ $(( ${#changed[@]} + ${#added[@]} + ${#deleted[@]} )) -eq 0 ]; then
+              [ ${#other[@]} -gt 0 ] && { printf '%s\n' "${other[@]}"; echo; } || echo "(No changes found)"
+            fi
+          } > "$out"
+
+          echo "body_path=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Update GitHub Wiki (index + per-tag page)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          current="${{ steps.tags.outputs.current }}"
+          outfile="${{ steps.changelog.outputs.body_path }}"
+          idx_date="${{ steps.tags.outputs.tag_date_human }}"
+
+          WIKI_URL="https://${GITHUB_ACTOR}:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          git clone --depth 1 "$WIKI_URL" wiki
+
+          mkdir -p "wiki/Changelog"
+
+          # Per-tag page
+          cp "$outfile" "wiki/Changelog/${current}.md"
+
+          # Index page (prepend new entry)
+          index="wiki/Changelog.md"
+          if [ -f "$index" ]; then
+            awk -v cur="Changelog/${current}.md" 'index($0, cur){next}{print}' "$index" > wiki/_old.md
+          else
+            echo "# Changelog" > wiki/_old.md
+            echo >> wiki/_old.md
+          fi
+
+          {
+            if ! head -n1 wiki/_old.md | grep -qi '^# Changelog'; then
+              echo "# Changelog"; echo
+            else
+              head -n1 wiki/_old.md; echo
+            fi
+            echo "- **v${current}** — ${idx_date} — [Notes](Changelog/${current}.md)"
+            echo
+            tail -n +2 wiki/_old.md || true
+          } > "$index"
+          rm -f wiki/_old.md
+
+          pushd wiki >/dev/null
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Changelog/${current}.md" "Changelog.md"
+          git commit -m "Wiki: add changelog for ${current}" || echo "No wiki changes to commit."
+          git push
+          popd >/dev/null
