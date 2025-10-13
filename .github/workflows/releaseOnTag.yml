@@ -105,11 +105,14 @@ jobs:
 
           echo "body_path=$outfile" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (published, not draft)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tags.outputs.current }}
           name: Gungame v${{ steps.tags.outputs.current }}
           body_path: ${{ steps.changelog.outputs.body_path }}
+          draft: false          # ensure it's published
+          prerelease: false     # mark as a normal release
+          make_latest: true     # set as the latest release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
