@@ -38,20 +38,18 @@ jobs:
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Determine previous tag and tag timestamp (human-friendly)
+      - name: Determine previous tag and human-friendly timestamp
         id: tags
         shell: bash
         run: |
           current="${{ steps.res.outputs.tag }}"
           prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
-
-          # Prefer annotated tagger date; fallback to commit date
+          # Prefer annotated tag date; fallback to commit date
           tag_date_iso="$(git for-each-ref --format='%(taggerdate:iso8601)' "refs/tags/${current}")"
           if [ -z "$tag_date_iso" ]; then
             tag_date_iso="$(git log -1 --format=%cI "${current}")"
           fi
-
-          # Human-friendly UTC (e.g., Monday, 13 October 2025 at 14:05 UTC)
+          # Human-friendly UTC
           tag_date_human="$(date -u -d "$tag_date_iso" '+%A, %d %B %Y at %H:%M UTC')"
 
           echo "current=$current"               >> "$GITHUB_OUTPUT"
@@ -78,15 +76,14 @@ jobs:
 
           changed=(); added=(); deleted=(); other=()
 
-          # %H hash, %s subject, %an author name, %aI author date (ISO 8601)
+          # %H hash, %s subject, %an author, %aI author date (ISO)
           while IFS=$'\x1f' read -r h s an ad || [ -n "${h:-}" ]; do
             [ -z "${h:-}" ] && continue
             short="${h:0:7}"
             line="- [${short}](${repo_url}/commit/${h}) ${s} — _by ${an} on ${ad}_"
-
             slc="$(printf '%s' "$s" | tr '[:upper:]' '[:lower:]')"
             if   [[ "$slc" == *changed* || "$slc" == *update* || "$slc" == *updated* ]]; then changed+=("$line")
-            elif [[ "$slc" == add*     || "$slc" == *added*                                   ]]; then added+=("$line")
+            elif [[ "$slc" == add*     || "$slc" == *added* ]]; then added+=("$line")
             elif [[ "$slc" == delet*   || "$slc" == *deleted* || "$slc" == *remove* || "$slc" == *removed* ]]; then deleted+=("$line")
             else other+=("$line"); fi
           done < <(git log "$range" --pretty=format:'%H%x1f%s%x1f%an%x1f%aI')
@@ -109,7 +106,7 @@ jobs:
 
           echo "body_path=$out" >> "$GITHUB_OUTPUT"
 
-      - name: Update GitHub Wiki (index + per-tag page + sidebar grouping)
+      - name: Update GitHub Wiki (nest under Changelog, internal links, tidy)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,12 +119,16 @@ jobs:
           WIKI_URL="https://${GITHUB_ACTOR}:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
           git clone --depth 1 "$WIKI_URL" wiki
 
+          # Ensure Changelog folder exists and move version page there
           mkdir -p "wiki/Changelog"
-
-          # Per-tag page under Changelog/
           cp "$outfile" "wiki/Changelog/${current}.md"
 
-          # Update Changelog.md (index) – prepend new entry, dedupe
+          # ✨ Clean up any accidentally created root-level version page
+          if [ -f "wiki/${current}.md" ]; then
+            git -C wiki rm -f "${current}.md" || rm -f "wiki/${current}.md" || true
+          fi
+
+          # Update Changelog index with INTERNAL wiki link (renders page, not raw)
           index="wiki/Changelog.md"
           if [ -f "$index" ]; then
             awk -v cur="Changelog/${current}.md" 'index($0, cur){next}{print}' "$index" > wiki/_old_index.md
@@ -141,18 +142,18 @@ jobs:
             else
               head -n1 wiki/_old_index.md; echo
             fi
-            echo "- **v${current}** — ${idx_date} — [Notes](Changelog/${current}.md)"
+            # [[Page|Alias]] ensures wiki-rendered navigation instead of raw file links
+            echo "- **v${current}** — ${idx_date} — [[Changelog/${current}|Notes]]"
             echo
             tail -n +2 wiki/_old_index.md || true
           } > "$index"
           rm -f wiki/_old_index.md
 
-          # Update _Sidebar.md – ensure a "Changelog" section with this tag link under it
+          # Update _Sidebar.md to group under a Changelog section (use internal link)
           sidebar="wiki/_Sidebar.md"
-          link="* [v${current}](Changelog/${current}.md) — ${idx_date}"
+          link="* [[Changelog/${current}|v${current}]] — ${idx_date}"
 
           if [ -f "$sidebar" ]; then
-            # Remove any duplicate link, then insert right after "## Changelog"
             awk -v L="$link" -v cur="Changelog/${current}.md" '
               BEGIN{added=0}
               tolower($0) ~ /^## changelog/ {
@@ -160,7 +161,7 @@ jobs:
                 if (added==0) { print ""; print L; added=1 }
                 next
               }
-              index($0, cur){ next }  # drop existing duplicate link
+              index($0, cur){ next }  # drop existing duplicate link lines
               { print }
               END{
                 if (added==0){
@@ -179,13 +180,12 @@ jobs:
               echo
             } > wiki/_Sidebar.new.md
           fi
-
           mv wiki/_Sidebar.new.md "$sidebar"
 
           pushd wiki >/dev/null
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Changelog/${current}.md" "Changelog.md" "_Sidebar.md"
-          git commit -m "Wiki: add changelog for ${current}" || echo "No wiki changes to commit."
+          git add "Changelog/${current}.md" "Changelog.md" "_Sidebar.md" || true
+          git commit -m "Wiki: add changelog for ${current} (nested + internal links)" || echo "No wiki changes to commit."
           git push
           popd >/dev/null
