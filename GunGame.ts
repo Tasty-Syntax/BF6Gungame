@@ -318,6 +318,15 @@ export async function OnPlayerEarnedKill(
   );
 
   if (playerLevel == MAX_LEVEL) {
+    if (
+      mod.EventDeathTypeCompare(
+        eventInfo.eventDeathType,
+        mod.PlayerDeathTypes.Melee
+      )
+    ) {
+      return;
+    }
+    
     mod.AddUIText(
       "FinalLevel",
       mod.CreateVector(0, 250, 0),
