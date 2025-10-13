@@ -1,0 +1,67 @@
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - '*'           # Trigger on any new tag push
+  workflow_dispatch:  # Allow manual run if needed
+
+permissions:
+  contents: write     # Needed to create GitHub releases
+
+jobs:
+  release:
+    if: github.event.deleted != true   # Skip if the tag was deleted
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history (with tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine current and previous tag
+        id: tags
+        shell: bash
+        run: |
+          current="${{ github.ref_name }}"   # e.g. 0.0.3
+          prev="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || echo "")"
+
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "previous=$prev"   >> "$GITHUB_OUTPUT"
+
+      - name: Build changelog
+        id: changelog
+        shell: bash
+        run: |
+          current="${{ steps.tags.outputs.current }}"
+          previous="${{ steps.tags.outputs.previous }}"
+
+          if [ -n "$previous" ]; then
+            range="$previous..$current"
+          else
+            # First-ever tag — include all history
+            range="$current"
+          fi
+
+          log="$(git log "$range" --pretty=format:'- %s')"
+
+          if [ -z "$log" ]; then
+            log="No new commits since previous tag."
+          fi
+
+          # Escape for GitHub Actions output
+          log="${log//'%'/'%25'}"
+          log="${log//$'\n'/'%0A'}"
+          log="${log//$'\r'/'%0D'}"
+
+          echo "body=$log" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tags.outputs.current }}
+          name: Gungame v${{ steps.tags.outputs.current }}
+          body: ${{ steps.changelog.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
