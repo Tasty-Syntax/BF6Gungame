@@ -23,7 +23,7 @@ function HandleOngoingPlayer(conditionState: any, eventInfo: any) {
   if (timestamp === mod.GetMatchTimeElapsed()) {
     return;
   }
-
+   
   timestamp = mod.GetMatchTimeElapsed();
 
   const Time = Math.floor(mod.GetMatchTimeElapsed());
@@ -88,7 +88,7 @@ function InitPlayerOnJoin(eventInfo: any) {
     mod.AddUIText(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
       mod.CreateVector(0, 0, 0),
-      mod.CreateVector(150, 50, 50),
+      mod.CreateVector(130, 50, 50),
       mod.UIAnchor.CenterLeft,
       mod.Message("Level: {}", 1),
       eventInfo.eventPlayer
@@ -111,12 +111,12 @@ function InitPlayerOnJoin(eventInfo: any) {
     mod.AddUIText(
       "Time",
       mod.CreateVector(0, 0, 0),
-      mod.CreateVector(160, 50, 50),
+      mod.CreateVector(170, 50, 50),
       mod.UIAnchor.TopCenter,
       mod.Message("Match Time: {}", 1),
       eventInfo.eventPlayer
     );
-    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("Time"), 0.5);
+    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("Time"), 0.3);
     mod.SetUITextSize(mod.FindUIWidgetWithName("Time"), 25);
     mod.SetUITextAnchor(mod.FindUIWidgetWithName("Time"), mod.UIAnchor.Center);
   }
