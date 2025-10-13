@@ -1,4 +1,4 @@
-name: Wiki changelog on tag (single page)
+name: Wiki changelog on tag
 
 on:
   push:
