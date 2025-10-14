@@ -6,41 +6,29 @@ function InitPlayerOnJoin(eventInfo: any) {
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
     )
   ) {
-    mod.AddUIText(
+    UiText.displayCustomNotification(
       "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer),
-      mod.CreateVector(0, 0, 0),
-      mod.CreateVector(130, 50, 50),
+      Vector3.zero().toModVector(),
+      new Vector3(130, 50, 50).toModVector(),
       mod.UIAnchor.CenterLeft,
       mod.Message("Level: {}", 1),
       eventInfo.eventPlayer
-    );
-    mod.SetUIWidgetBgAlpha(
-      mod.FindUIWidgetWithName(
-        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-      ),
-      0.25
-    );
-    mod.SetUITextSize(
-      mod.FindUIWidgetWithName(
-        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-      ),
-      30
-    );
+    )
+      .setTextBoxAlpha(0.25)
+      .setTextSize(30);
   }
 
-  if (!mod.FindUIWidgetWithName("Time")) {
-    mod.AddUIText(
-      "Time",
-      mod.CreateVector(0, 0, 0),
-      mod.CreateVector(190, 50, 50),
-      mod.UIAnchor.TopCenter,
-      mod.Message("Match Time: {}", 1),
-      eventInfo.eventPlayer
-    );
-    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("Time"), 0.3);
-    mod.SetUITextSize(mod.FindUIWidgetWithName("Time"), 25);
-    mod.SetUITextAnchor(mod.FindUIWidgetWithName("Time"), mod.UIAnchor.Center);
-  }
+  UiText.displayCustomNotification(
+    "Time",
+    Vector3.zero().toModVector(),
+    new Vector3(190, 50, 50).toModVector(),
+    mod.UIAnchor.TopCenter,
+    mod.Message("Match Time: {}", 1),
+    eventInfo.eventPlayer
+  )
+    .setTextBoxAlpha(0.3)
+    .setTextSize(25)
+    .setTextAnchor(mod.UIAnchor.Center);
 
   UpdateScoreboardForPlayer(
     eventInfo,

@@ -14,8 +14,6 @@ function SetupPlayer(eventInfo: any) {
   if (playerLevel < MAX_LEVEL) {
     const item = Weapons[playerLevel];
     Equip(item, eventInfo.eventPlayer);
-    // mod.AddEquipment(eventInfo.eventPlayer, );
-    // mod.AddEquipment(eventInfo.eventPlayer, mod.Gadgets.Melee_Combat_Knife);
   } else {
     SetKnifeWeapon(eventInfo.eventPlayer);
   }

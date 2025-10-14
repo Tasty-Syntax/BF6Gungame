@@ -12,14 +12,10 @@ function HandleOngoingPlayer(conditionState: any, eventInfo: any) {
   const Seconds = Time % 60;
 
   if (mod.GetMatchTimeElapsed() == 0) {
-    mod.SetUITextLabel(
-      mod.FindUIWidgetWithName("Time"),
-      mod.Message("Game not started!")
-    );
+    UiText.get("Time").setMessage("Game not started!");
   } else {
-    mod.SetUITextLabel(
-      mod.FindUIWidgetWithName("Time"),
-      mod.Message("{} min : {} sec ", Minutes, Seconds)
+    UiText.get("Time").setMessage(
+      mod.Message("{0} min : {1} sec", Minutes, Seconds)
     );
   }
 }

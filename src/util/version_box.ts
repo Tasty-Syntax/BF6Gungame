@@ -1,11 +1,11 @@
 function CreateVersionBox() {
-  mod.AddUIText(
+  UiText.displayCustomNotification(
     "VersionBox",
     mod.CreateVector(15, 5, 10),
     mod.CreateVector(100, 50, 50),
     mod.UIAnchor.TopRight,
     mod.Message("v{}", VERSION)
-  );
-  mod.SetUITextSize(mod.FindUIWidgetWithName("VersionBox"), 20);
-  mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("VersionBox"), 0);
+  )
+    .setTextSize(20)
+    .setTextBoxAlpha(0);
 }

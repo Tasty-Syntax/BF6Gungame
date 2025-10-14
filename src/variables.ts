@@ -28,3 +28,9 @@ enum Variables {
  */
 
 let GameModeActive = false;
+
+/**
+ * Player Level Text
+ */
+
+let PlayerLevelText: UiText;

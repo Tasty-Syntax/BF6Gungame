@@ -1,13 +1,10 @@
-function PrepareScoreboardForGame() {
-  mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
-  mod.SetScoreboardColumnNames(
-    mod.Message("Level"),
-    mod.Message("Kills"),
-    mod.Message("Deaths")
-  );
-  mod.SetScoreboardColumnWidths(1, 1, 1, 0, 0);
-  mod.SetScoreboardHeader(mod.Message("Gun Game"));
-  mod.SetScoreboardSorting(1, false);
+function PrepareScoreboardForGame(): void {
+  CustomScoreboard.prepareScoreboard()
+    .setScoreboardType(mod.ScoreboardType.CustomFFA)
+    .setScoreBoardHeader("GunGame")
+    .setScoreboardColumns("Level", "Kills", "Deaths")
+    .setScoreboardColumnWidths(1, 1, 1, 0, 0);
+
   mod.SetGameModeTargetScore(MAX_LEVEL);
   mod.SetGameModeTimeLimit(20 * 60); // 20 minutes
 }

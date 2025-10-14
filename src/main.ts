@@ -10,7 +10,6 @@ export function OngoingPlayer(eventPlayer: mod.Player) {
     modlib.getPlayerCondition(eventPlayer, eventNum++),
     eventInfo
   );
-
 }
 export function OnPlayerJoinGame(eventPlayer: mod.Player) {
   const eventInfo = { eventPlayer };
@@ -57,7 +56,7 @@ export async function OnPlayerEarnedKill(
       return;
     }
 
-    mod.AddUIText(
+    const finalLevelNotification = UiText.displayCustomNotification(
       "FinalLevel",
       mod.CreateVector(0, 250, 0),
       mod.CreateVector(600, 50, 50),
@@ -66,26 +65,21 @@ export async function OnPlayerEarnedKill(
         "Player {} has reached the last level!",
         eventInfo.eventPlayer
       )
-    );
-    mod.SetUIWidgetBgAlpha(mod.FindUIWidgetWithName("FinalLevel"), 0.5);
-    mod.SetUITextSize(mod.FindUIWidgetWithName("FinalLevel"), 25);
-    mod.SetUIWidgetBgColor(
-      mod.FindUIWidgetWithName("FinalLevel"),
-      mod.CreateVector(1, 0.5, 0)
-    );
-    mod.SetUITextAnchor(
-      mod.FindUIWidgetWithName("FinalLevel"),
-      mod.UIAnchor.Center
-    );
+    )
+      .setTextBoxAlpha(0.5)
+      .setTextSize(25)
+      .setTextBoxColor(mod.CreateVector(1, 0.5, 0))
+      .setTextAnchor(mod.UIAnchor.Center)
+      .setTimeout(5);
 
-    PlaySound(mod.RuntimeSpawn_Common.SFX_UI_Matchmaking_Start_OneShot2D, 1000);
-    PlaySound(
+    Sfx.playSound(
+      mod.RuntimeSpawn_Common.SFX_UI_Matchmaking_Start_OneShot2D,
+      1000
+    );
+    Sfx.playSound(
       mod.RuntimeSpawn_Common.SFX_UI_Notification_SectorTaken_Reveal_OneShot2D,
       1000
     );
-
-    await mod.Wait(5);
-    mod.DeleteUIWidget(mod.FindUIWidgetWithName("FinalLevel"));
   }
 }
 
@@ -104,4 +98,3 @@ export function OnPlayerDied(
 
   HandlePlayerDied(eventInfo);
 }
-

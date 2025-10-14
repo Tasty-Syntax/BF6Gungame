@@ -26,22 +26,20 @@ function HandlePlayerKill(eventInfo: PlayerEarnedKill) {
     );
     playerLevel += 1;
 
-    mod.DisplayHighlightedWorldLogMessage(
+    UiText.displayWorldLogNotification(
       mod.Message("Level up!"),
       eventInfo.eventPlayer
     );
-    PlaySoundPlayer(
-      eventInfo.eventPlayer,
+
+    Sfx.playSound(
       mod.RuntimeSpawn_Common.SFX_UI_EOR_RankUp_Normal_OneShot2D,
-      500
+      500,
+      eventInfo.eventPlayer
     );
 
-    mod.SetUITextLabel(
-      mod.FindUIWidgetWithName(
-        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-      ),
-      mod.Message("Level: {}", playerLevel + 1)
-    );
+    UiText.get(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+    ).setMessage(mod.Message("Level: {}", playerLevel + 1));
 
     // reset killcount to 0
     mod.SetVariable(

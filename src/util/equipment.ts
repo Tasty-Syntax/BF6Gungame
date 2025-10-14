@@ -35,7 +35,7 @@ function UnequipAll(player: mod.Player) {
 function SetKnifeWeapon(player: mod.Player) {
   // Remove old weapon
   UnequipAll(player);
-  mod.AddEquipment(player, mod.Gadgets.Melee_Combat_Knife);
+  mod.AddEquipment(player, mod.Gadgets.Melee_Hunting_Knife);
 }
 
 function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
@@ -61,13 +61,9 @@ function HandlePlayerLoseLevelOnKnifeDeath(eventInfo: PlayerDied) {
       playerLevel
     );
 
-    // Maybe put this into a function to save some lines of code
-    mod.SetUITextLabel(
-      mod.FindUIWidgetWithName(
-        "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
-      ),
-      mod.Message("Level: {}", playerLevel + 1)
-    );
+    UiText.get(
+      "LevelMessage_" + mod.GetObjId(eventInfo.eventPlayer)
+    ).setMessage(mod.Message("Level: {}", playerLevel + 1));
 
     UpdateScoreboardForPlayer(
       eventInfo,
