@@ -138,4 +138,50 @@ class Player {
     mod.RemoveEquipment(this._player, mod.InventorySlots.ClassGadget);
     mod.RemoveEquipment(this._player, mod.InventorySlots.Throwable);
   }
+
+  /**
+   * Plays a sound effect for the player
+   * @param soundEffect sound effect to play
+   * @param volume volume of the sound effect
+   */
+  playSoundPlayer(soundEffect: mod.SFX, volume: number) {
+    mod.EnableSFX(soundEffect, true);
+    mod.PlaySound(soundEffect, volume, this._player);
+  }
+
+  /**
+   * Displays a custom notification
+   * @param name unique identifier for the notification
+   * @param position notification position
+   * @param textBoxSize notification size
+   * @param anchor notification anchor point
+   * @param message notification message
+   * @param recipient optional recipient for the notification. If not provided, the notification will be displayed for all.
+   * @returns a UiText object for the notification
+   */
+  static displayCustomNotification(
+    name: string,
+    position: mod.Vector,
+    textBoxSize: mod.Vector,
+    anchor: mod.UIAnchor,
+    message: string | mod.Message,
+    recipient?: mod.Player | mod.Team
+  ) {
+    if (typeof message === "string") {
+      message = mod.Message(message);
+    }
+    if (recipient) {
+      mod.AddUIText(name, position, textBoxSize, anchor, message, recipient);
+    } else {
+      mod.AddUIText(name, position, textBoxSize, anchor, message);
+    }
+
+    return new UiText(name);
+  }
+
+  displayCustomNotification(
+    ...args: Parameters<(typeof UiText)["displayCustomNotification"]>
+  ) {
+    UiText.displayCustomNotification(...args);
+  }
 }
