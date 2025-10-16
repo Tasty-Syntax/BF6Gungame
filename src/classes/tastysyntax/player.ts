@@ -180,8 +180,11 @@ class Player {
   }
 
   displayCustomNotification(
-    ...args: Parameters<(typeof UiText)["displayCustomNotification"]>
+    ...args: Exclude<
+      Parameters<(typeof UiText)["displayCustomNotification"]>,
+      "recipient"
+    >
   ) {
-    UiText.displayCustomNotification(...args);
+    return UiText.displayCustomNotification(...args);
   }
 }

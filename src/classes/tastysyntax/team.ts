@@ -25,10 +25,12 @@ class Team {
     mod.EnableSFX(soundEffect, true);
     mod.PlaySound(soundEffect, volume, this._team);
   }
-
   displayCustomNotification(
-    ...args: Parameters<(typeof UiText)["displayCustomNotification"]>
+    ...args: Exclude<
+      Parameters<(typeof UiText)["displayCustomNotification"]>,
+      "recipient"
+    >
   ) {
-    UiText.displayCustomNotification(...args);
+    return UiText.displayCustomNotification(...args);
   }
 }
